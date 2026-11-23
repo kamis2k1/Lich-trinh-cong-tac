@@ -1,6 +1,7 @@
 // Kiểm thử tự động toàn bộ tình huống nhập liệu (Playwright, trình duyệt Chrome thật)
 // Chạy: npx http-server . -p 8080 -s & node tests/e2e.mjs
 import { chromium } from "playwright";
+import { readFileSync } from "node:fs";
 
 const BASE = process.env.BASE || "http://127.0.0.1:8080/";
 const GEO = { // dữ liệu giả cho OpenStreetMap
@@ -305,6 +306,45 @@ await navTest("Hết lượt tra (429) → báo hết lượt", 429, async p => 
 await navTest("Xoá mã → nút NAVITIME biến mất", 200, async p => {
   await connect(p); await search(p, T); ok(await p.$(".navbtn"), "chưa có nút");
   await p.click("#navSetup summary"); await p.click("#navDel"); await p.waitForFunction(() => !document.querySelector(".navbtn")); ok(/Chưa kết nối/.test(await p.textContent("#navState")), "chưa xoá");
+});
+
+// 11. Nhận chuyến từ nút bookmark trên Yahoo
+const YS = JSON.parse(readFileSync(new URL("./yahoo-sample.json", import.meta.url), "utf8"));
+const yHash = d => "#yahoo=" + encodeURIComponent(JSON.stringify({ ...YS, d }));
+await test("Nút Yahoo gửi về → mở lại lịch trình, hiện 3 chuyến đúng giờ/giá/tên tàu", async p => {
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  await p.goto(BASE + yHash(T.d1)); await p.waitForSelector('.leg[data-leg="go"] .ypick');
+  const t = await p.textContent('.leg[data-leg="go"] .nres');
+  ok(/07:18 → 12:34/.test(t) && /18,070/.test(t) && /06:35 → 12:34/.test(t) && /17,140/.test(t), t.slice(0, 200));
+  ok(/みどり6号→のぞみ16号→しまなみライナー/.test(t), "tên tàu: " + t.slice(0, 300)); ok(/佐世保線/.test(t), "thiếu tuyến thường");
+  ok(!(await p.evaluate(() => location.hash)), "chưa xoá dữ liệu trên thanh địa chỉ");
+});
+await test("Chọn chuyến Yahoo → lịch trình dùng giờ thật", async p => {
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  await p.goto(BASE + yHash(T.d1)); await p.click('.leg[data-leg="go"] .ypick[data-i="2"]'); await p.waitForSelector('.leg[data-leg="go"].done');
+  ok(/06:35\s*khởi hành.*lúc 12:34/.test(await p.textContent("#plan")), "lịch trình chưa cập nhật"); ok(/Giờ thật/.test(await p.textContent("#hero")), "thiếu nhãn");
+});
+await test("Chuyến Yahoo ngày về → tự gán vào lượt về", async p => {
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  await p.goto(BASE + yHash(T.d2)); await p.waitForSelector('.leg[data-leg="back"] .ypick'); ok(!(await p.$('.leg[data-leg="go"] .ypick')), "gán nhầm lượt đi");
+});
+await test("Chuyến Yahoo khác ngày → báo không khớp", async p => {
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  await p.goto(BASE + yHash(day(30))); await p.waitForFunction(() => /không khớp/.test(document.getElementById("err").textContent));
+});
+await test("Gửi từ Yahoo khi chưa lập lịch trình → hướng dẫn lập trước", async p => {
+  await p.goto(BASE + yHash(T.d1)); await p.waitForFunction(() => /lập lịch trình/.test(document.getElementById("err").textContent));
+});
+await test("Dữ liệu gửi về bị hỏng / chèn mã → báo lỗi, không chạy mã", async p => {
+  await p.goto(BASE + "#yahoo=%7Bxx"); await p.waitForFunction(() => /bị lỗi/.test(document.getElementById("err").textContent));
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  await p.goto(BASE + "#yahoo=" + encodeURIComponent(JSON.stringify({ d: T.d1, f: '<img src=x onerror="window.__w=1">', t: "x", r: ["08:00発→09:00着 1,000円 ＪＲ<img/src=x/onerror=window.__w=1>"] })));
+  await p.waitForSelector(".ypick"); ok(!(await p.evaluate(() => window.__w)), "mã đã chạy!");
+});
+await test("Nút bookmark là mã javascript hợp lệ, đúng địa chỉ web", async p => {
+  const href = await p.$eval("#bmLink", a => a.getAttribute("href"));
+  ok(href.startsWith("javascript:(()=>{") && !href.includes("#yahoo"), href.slice(0, 60));
+  new Function(href.slice(11)); ok(href.includes("127.0.0.1:8080/\\x23yahoo="), "sai địa chỉ");
 });
 
 await browser.close();

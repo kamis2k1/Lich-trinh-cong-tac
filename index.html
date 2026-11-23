@@ -103,6 +103,8 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
 .saved .s b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .saved button{padding:6px 12px;min-height:34px;font-size:.82rem}
 .ai{white-space:pre-wrap}
+.bm{display:inline-block;padding:10px 14px;border-radius:10px;background:var(--ok);color:#fff;text-decoration:none;font-weight:700;cursor:grab}
+@media (prefers-color-scheme:dark){.bm{color:#0f1318}}
 .steps{padding-left:20px;margin:8px 0}.steps li{margin:4px 0}.steps a{color:var(--accent)}
 .navbtn{width:100%;margin-top:8px}
 .nres{margin-top:8px}
@@ -168,6 +170,15 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
       <div id="ai" class="ai" style="margin-top:12px"></div></div>
   </div>
 
+  <div class="card" id="bmCard"><h2>📥 Lấy giờ từ Yahoo bằng 1 chạm</h2>
+    <p class="muted">Cài nút này một lần. Sau đó trên trang kết quả Yahoo!乗換案内, bấm nút là các chuyến tự gửi về đây để bạn chọn.</p>
+    <div class="actions"><a id="bmLink" class="bm" href="#" title="Kéo nút này lên thanh dấu trang">📥 Gửi về Lịch trình</a><button type="button" class="ghost" id="bmCopy">Copy mã nút</button><span id="bmMsg" class="muted"></span></div>
+    <details><summary>Cách cài</summary>
+      <p class="muted"><b>Máy tính:</b> kéo nút "📥 Gửi về Lịch trình" thả lên thanh dấu trang (bookmark bar).</p>
+      <p class="muted"><b>Điện thoại (Chrome):</b> 1) Bấm "Copy mã nút". 2) Lưu dấu trang cho trang bất kỳ (⋮ → ☆), rồi sửa dấu trang đó: đặt tên <b>guive</b>, dán mã vào ô URL. 3) Khi đang ở trang kết quả Yahoo, gõ <b>guive</b> lên thanh địa chỉ và chọn dấu trang đó.</p>
+      <p class="muted">Cách dùng: lập lịch trình ở đây → bấm Yahoo!乗換案内 → bấm nút → chọn chuyến.</p>
+    </details>
+  </div>
   <div class="card" id="navCard"><h2>⚙ Kết nối NAVITIME</h2>
     <p class="muted" id="navState">Chưa kết nối. Khi kết nối, web tự tìm các chuyến tàu (tuyến, chỗ đổi tàu, giá vé) ngay trong trang.</p>
     <details id="navSetup"><summary>Cách kết nối (miễn phí, 500 lượt tra/tháng)</summary>
@@ -180,6 +191,6 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
   </div>
   <div class="card" id="savedCard"><h2>☆ Chuyến đã lưu</h2><ul id="saved" class="saved"><li class="muted">Chưa có chuyến nào.</li></ul></div>
 </div>
-<script src="app.js?v=17"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

@@ -163,7 +163,7 @@ function parseYahoo(t){
   const m=t.match(/(\d{1,2}:\d{2})\s*発?\s*[→～~\-－]+\s*(\d{1,2}:\d{2})/)||t.match(/(\d{1,2}:\d{2})[\s\S]*?(\d{1,2}:\d{2})/);
   const f=t.match(/(?:IC優先|きっぷ優先|現金優先)?[：:\s]*([\d,]{3,9})\s*円/);
   const pad=x=>x.padStart(5,"0");
-  const names=[...t.matchAll(/(?:ＪＲ|JR)?(?:特急|新幹線|快速|高速バス|空港バス)[^\s]*/g)].map(x=>{let v=x[0].replace(/^(ＪＲ|JR)/,"");if(/バス/.test(v)&&v.includes("・"))v=v.split("・").pop();return v.replace(/^新幹線/,"")}).filter((v,i,a)=>v&&a.indexOf(v)===i).slice(0,4);
+  const names=[...t.matchAll(/(?:ＪＲ|JR)[^\s]+|(?:特急|新幹線|快速|高速バス|空港バス)[^\s]*/g)].map(x=>{let v=x[0].replace(/^(ＪＲ|JR)/,"");if(/バス/.test(v)&&v.includes("・"))v=v.split("・").pop();return v.replace(/^新幹線/,"")}).filter((v,i,a)=>v&&a.indexOf(v)===i).slice(0,4);
   return {dep:m?pad(m[1]):"",arr:m?pad(m[2]):"",fare:f?f[1].replace(/,/g,""):"",line:names.join("→")};
 }
 document.addEventListener("input",e=>{if(!e.target.classList.contains("rpaste"))return;const box=e.target.closest(".leg"),r=parseYahoo(e.target.value);
@@ -282,6 +282,7 @@ async function build(){
   CUR=(A&&A[5]==="JP")||(!A&&B&&B[5]==="JP")?"JPY":"VND";
   const jpDest=B&&B[5]==="JP",intl=A&&B&&A[5]!==B[5];
   cur={fromT,toT,A,B,d1,d2,pax,pref,note,nights,jpDest,intl,m1,t1,m2,t2};
+  store.set("last",{fromT,toT,d1,d2,pax,pref,note,m1,t1,m2,t2});
 
   let opts,dist=null;
   if(A&&B){({opts,dist}=transportOptions(A,B))}
@@ -359,6 +360,37 @@ $("save").onclick=()=>{const s=loadSaved();s.unshift({fromT:cur.fromT,toT:cur.to
 $("saved").onclick=e=>{const s=loadSaved();if(e.target.dataset.i){const t=s[e.target.dataset.i];$("from").value=t.fromT;$("to").value=t.toT;$("d1").value=t.d1;$("d2").value=t.d2;if(t.t1){$("m1").value=t.m1;$("t1").value=t.t1;$("m2").value=t.m2;$("t2").value=t.t2}$("pax").value=t.pax;$("pref").value=t.pref;$("note").value=t.note||"";build()}
   if(e.target.dataset.del){s.splice(+e.target.dataset.del,1);try{localStorage.setItem("trips",JSON.stringify(s))}catch{}renderSaved()}};
 renderSaved();renderPlaces();renderNav();
+// ===== Nhận chuyến gửi từ trang Yahoo (nút bookmark) =====
+const BM=`javascript:(()=>{var p=new URL(location.href).searchParams,t=document.body.innerText,c=t.split(/\\nルート\\d+\\n/).filter(x=>/\\d{1,2}:\\d{2}発→\\d{1,2}:\\d{2}着/.test(x)).slice(0,6).map(x=>x.slice(0,900));if(!/transit\\.yahoo\\.co\\.jp/.test(location.host)||!c.length){alert('Hãy mở trang KẾT QUẢ tìm đường của Yahoo!乗換案内 rồi bấm lại.');return}var z=n=>('0'+n).slice(-2);location.href='${location.origin+location.pathname}\\x23yahoo='+encodeURIComponent(JSON.stringify({d:p.get('y')+'-'+z(p.get('m'))+'-'+z(p.get('d')),f:p.get('from')||'',t:p.get('to')||'',r:c}))})()`;
+$("bmLink").href=BM;
+$("bmCopy").onclick=async()=>{try{await navigator.clipboard.writeText(BM);$("bmMsg").textContent="Đã copy mã nút."}catch{$("bmMsg").textContent="Không copy được, hãy giữ lâu vào nút để copy link."}};
+async function receiveYahoo(){
+  const h=location.hash;if(!h.startsWith("#yahoo="))return;
+  history.replaceState(null,"",location.pathname+location.search);
+  let y;try{y=JSON.parse(decodeURIComponent(h.slice(7)))}catch{return setErr("Dữ liệu gửi từ Yahoo bị lỗi, hãy bấm nút lại.")}
+  if(!y||!Array.isArray(y.r)||!/^\d{4}-\d{2}-\d{2}$/.test(y.d||""))return setErr("Dữ liệu gửi từ Yahoo bị lỗi, hãy bấm nút lại.");
+  const routes=y.r.slice(0,6).map(t=>parseYahoo(String(t).slice(0,1500))).filter(r=>r.dep&&r.arr);
+  const L=store.get("last");
+  if(!L)return setErr("Hãy lập lịch trình trên web trước, rồi mới gửi chuyến từ Yahoo về.");
+  $("from").value=L.fromT;$("to").value=L.toT;$("d1").value=L.d1;$("d2").value=L.d2;$("pax").value=L.pax;$("pref").value=L.pref;$("note").value=L.note||"";$("m1").value=L.m1;$("t1").value=L.t1;$("m2").value=L.m2;$("t2").value=L.t2;
+  await build();if(!cur)return;
+  const n=x=>(x||"").replace(/(駅|市|町|村)$/,"");
+  let leg=y.d===cur.d2&&y.d!==cur.d1?"back":y.d===cur.d1&&y.d!==cur.d2?"go":"";
+  if(!leg&&y.d===cur.d1){const fj=document.querySelector('.leg[data-leg="back"] .btns a');leg=fj&&n(new URL(fj.href).searchParams.get("from"))===n(y.f)?"back":"go"}
+  const box=document.querySelector(`.leg[data-leg="${leg}"]`);
+  if(!box)return setErr(`Chuyến Yahoo ngày ${dmy(y.d)} không khớp ngày đi (${dmy(cur.d1)}) hay ngày về (${dmy(cur.d2)}) của lịch trình.`);
+  const out=box.querySelector(".nres")||box.insertBefore(Object.assign(document.createElement("div"),{className:"nres"}),box.querySelector(".fix"));
+  out._rs=routes.map(r=>({...r,parts:[],yahoo:true}));
+  out.innerHTML=`<div class="realbox">📥 Nhận ${routes.length} chuyến từ Yahoo (${esc(y.f)} → ${esc(y.t)}, ${dmy(y.d)}). Chọn chuyến bạn sẽ đi:</div>`+
+    routes.map((r,i)=>`<div class="nr"><div class="tt">${esc(r.dep)} → ${esc(r.arr)}${r.fare?` <span class="muted">· ¥${Number(r.fare).toLocaleString("ja-JP")}</span>`:""}</div><div class="ln">${esc(r.line||"")}</div><button type="button" class="primary ypick" data-i="${i}">Chọn chuyến này</button></div>`).join("");
+  box.scrollIntoView({block:"start"});
+}
+document.addEventListener("click",async e=>{const pk=e.target.closest(".ypick");if(!pk||!cur)return;
+  const box=pk.closest(".leg"),r=box.querySelector(".nres")._rs[+pk.dataset.i],data=store.get(realKey(cur))||{};
+  data[box.dataset.leg]={dep:r.dep,arr:r.arr,fare:r.fare?Number(r.fare):0,line:(r.line||"").slice(0,80)};
+  store.set(realKey(cur),data);await build();const el=document.querySelector(`.leg[data-leg="${box.dataset.leg}"]`);el&&el.scrollIntoView({block:"center"})});
+receiveYahoo();
+window.addEventListener("hashchange",receiveYahoo);
 
 let sample=null;$("aiCard").classList.add("hidden");
 (async()=>{try{if(window.claude&&claude.use){sample=await claude.use("sample");if(sample)$("aiCard").classList.remove("hidden")}}catch{}})();
