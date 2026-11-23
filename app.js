@@ -129,13 +129,14 @@ function build(){
   $("links").innerHTML=L.map(l=>`<a href="${l[1]}" target="_blank" rel="noopener">${l[0]} ↗</a>`).join("");
 
   const best=opts[0],fN=A?short(A):fromT,tN=B?short(B):toT,days=[];
+  const via=best.n.replace(/\s*\(.*\)/,"");const viaL=/^[A-Z]{2}|Shinkansen/.test(via.split(" ")[0])?via:via.charAt(0).toLowerCase()+via.slice(1);
   const hub=best.k==="fly"?"sân bay":best.k==="train"?"ga":"bến xe";
   const checkin=jpDest?"15h":"14h",checkout=jpDest?"10h–11h":"12h";
   const local=jpDest?"Đi lại trong thành phố bằng tàu điện, dùng thẻ IC (Suica/ICOCA) hoặc Mobile Suica":"Đặt xe công nghệ (Grab, Xanh SM) trước giờ hẹn 30 phút để tránh kẹt xe";
   for(let i=0;i<=nights;i++){
     const dt=new Date(d1);dt.setDate(dt.getDate()+i);const label=`${wd[dt.getDay()]}, ${dmy(iso(dt))}`;let items;
-    if(i===0&&nights===0) items=[`Sáng sớm khởi hành từ ${fN} bằng ${best.n.toLowerCase()}`,`Làm việc tại ${tN}`,`Chiều tối quay về ${fN}`];
-    else if(i===0) items=[`Khởi hành từ ${fN} bằng ${best.n.toLowerCase()}${best.t?` (khoảng ${fmtH(best.t)})`:""}`,
+    if(i===0&&nights===0) items=[`Sáng sớm khởi hành từ ${fN} bằng ${viaL}`,`Làm việc tại ${tN}`,`Chiều tối quay về ${fN}`];
+    else if(i===0) items=[`Khởi hành từ ${fN} bằng ${viaL}${best.t?` (khoảng ${fmtH(best.t)})`:""}`,
       intl?"Mang hộ chiếu, kiểm tra visa/điều kiện nhập cảnh, đổi tiền hoặc mang thẻ quốc tế":`Từ ${hub} về khách sạn, nhận phòng từ ${checkin}`,
       intl?`Từ sân bay về khách sạn, nhận phòng từ ${checkin}`:"Chuẩn bị tài liệu, xác nhận lịch hẹn ngày mai"];
     else if(i===nights) items=[`Trả phòng trước ${checkout}${jpDest?", gửi hành lý ở tủ khoá (coin locker) tại ga":", gửi hành lý tại lễ tân"}`,
