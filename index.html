@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lên lịch trình công tác</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#1c2430;--muted:#5d6878;--line:#e2e6ec;--accent:#0b6bcb;--accent-soft:#e7f1fb;--ok:#1f7a4d}
+@media (prefers-color-scheme:dark){:root{--bg:#12161c;--card:#1b2129;--ink:#e8ecf1;--muted:#9aa5b4;--line:#2c3440;--accent:#5aa9f0;--accent-soft:#1d2b3a;--ok:#5cc28d}}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Be Vietnam Pro",system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+.wrap{max-width:960px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:1.6rem;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:4px;font-weight:500}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--card);color:var(--ink)}
+textarea{min-height:60px;resize:vertical}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:10px 16px;font-weight:600}
+.primary{background:var(--accent);color:#fff}
+.ghost{background:var(--accent-soft);color:var(--accent)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center}
+h2{font-size:1.15rem;margin:0 0 12px}
+.opt{display:grid;grid-template-columns:1fr auto;gap:8px;padding:12px 0;border-top:1px solid var(--line)}
+.opt:first-of-type{border-top:0}
+.opt b{display:block}
+.tag{display:inline-block;font-size:.75rem;padding:2px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent);margin-left:6px;font-weight:600}
+.best{background:#e3f5ec;color:var(--ok)}
+@media (prefers-color-scheme:dark){.best{background:#1b3428}}
+.muted{color:var(--muted);font-size:.9rem}
+.links a{display:inline-block;margin:4px 6px 4px 0;padding:7px 12px;border-radius:8px;border:1px solid var(--line);color:var(--accent);text-decoration:none;font-weight:500;font-size:.9rem}
+.links a:hover{background:var(--accent-soft)}
+.day{border-left:3px solid var(--accent);padding:4px 0 10px 14px;margin-left:4px}
+.day h3{margin:0 0 4px;font-size:1rem}
+.day ul{margin:4px 0 0;padding-left:18px}
+.err{color:#c0392b;margin-top:8px}
+.hidden{display:none}
+.ai{white-space:pre-wrap}
+.saved li{margin:4px 0}
+.saved button{padding:4px 10px;font-size:.8rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Lên lịch trình đi công tác</h1>
+  <p class="sub">Nhập ngày đi, ngày về, điểm đi và điểm đến. Hỗ trợ chặng trong Nhật Bản, trong Việt Nam và Nhật ⇄ Việt Nam. Trang sẽ gợi ý phương tiện, lập lịch trình theo ngày và mở sẵn trang đặt vé với thông tin đã điền.</p>
+
+  <form id="f" class="card">
+    <div class="grid">
+      <div><label for="from">Điểm đi</label><input id="from" list="cities" required placeholder="VD: Tokyo, Hà Nội"></div>
+      <div><label for="to">Điểm đến</label><input id="to" list="cities" required placeholder="VD: Osaka, Đà Nẵng"></div>
+      <div><label for="d1">Ngày đi</label><input id="d1" type="date" required></div>
+      <div><label for="d2">Ngày về</label><input id="d2" type="date" required></div>
+      <div><label for="pax">Số người</label><input id="pax" type="number" min="1" max="9" value="1"></div>
+      <div><label for="pref">Ưu tiên</label>
+        <select id="pref"><option value="fast">Nhanh nhất</option><option value="cheap">Tiết kiệm</option><option value="comfort">Thoải mái</option></select></div>
+    </div>
+    <div style="margin-top:12px"><label for="note">Công việc / ghi chú (tuỳ chọn)</label>
+      <textarea id="note" placeholder="VD: Họp khách hàng 10h sáng ngày 2 gần ga Umeda, cần khách sạn gần ga"></textarea></div>
+    <div class="row"><button class="primary" type="submit">Lập lịch trình</button><span id="err" class="err"></span></div>
+    <datalist id="cities"></datalist>
+  </form>
+
+  <div id="out" class="hidden">
+    <div class="card"><h2>Phương tiện gợi ý</h2><div id="opts"></div>
+      <p class="muted">Thời gian và giá là ước tính tham khảo. Giá vé thật hiển thị khi bạn mở trang đặt vé bên dưới.</p></div>
+    <div class="card"><h2>Đặt vé và phòng</h2><div id="links" class="links"></div></div>
+    <div class="card"><h2>Lịch trình theo ngày</h2><div id="plan"></div>
+      <div class="row"><button class="ghost" type="button" id="copy">Sao chép lịch trình</button><button class="ghost" type="button" id="save">Lưu chuyến này</button><span id="msg" class="muted"></span></div></div>
+    <div class="card" id="aiCard"><h2>Gợi ý chi tiết từ Claude</h2>
+      <p class="muted">Claude viết lịch trình chi tiết hơn: giờ bay nên chọn, khu vực ở, mẹo di chuyển nội thành, lưu ý thời tiết.</p>
+      <div class="row"><button class="primary" type="button" id="aiBtn">Nhờ Claude gợi ý</button></div>
+      <div id="ai" class="ai" style="margin-top:12px"></div></div>
+  </div>
+
+  <div class="card" id="savedCard"><h2>Chuyến đã lưu</h2><ul id="saved" class="saved"><li class="muted">Chưa có chuyến nào.</li></ul></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
