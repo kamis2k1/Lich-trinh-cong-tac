@@ -57,7 +57,10 @@ function routeLinks(from,to,fromJa,toJa,date,mode,t,legH){
   const H=Math.floor(gm/60),ap=H>=12?"pm":"am",h12=(H%12)||12,gmi=String(gm%60).padStart(2,"0");
   return [
     ["★ Yahoo!乗換案内 (giờ tàu chính xác)",`https://transit.yahoo.co.jp/search/result?from=${e(fromJa)}&to=${e(toJa)}&y=${y}&m=${mo}&d=${d}&hh=${h}&m1=${mi[0]}&m2=${mi[1]}&type=${mode==="arr"?4:1}&ticket=ic&expkind=1&ws=3&s=0&al=1&shin=1&ex=1&hb=1&lb=1&sr=1`],
-    ["Google Maps",`https://www.google.com/maps/dir/?saddr=${e(from)}&daddr=${e(to)}&dirflg=r&ttype=dep&date=${mo}%2F${d}%2F${y.slice(2)}&time=${h12}%3A${gmi}${ap}`]
+    // App Google Maps trên điện thoại chỉ nhận link api=1 (không có giờ); máy tính dùng link có giờ
+    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+      ?["Google Maps (chỉnh giờ trong app)",`https://www.google.com/maps/dir/?api=1&origin=${e(from)}&destination=${e(to)}&travelmode=transit`]
+      :["Google Maps",`https://www.google.com/maps/dir/?saddr=${e(from)}&daddr=${e(to)}&dirflg=r&ttype=dep&date=${mo}%2F${d}%2F${y.slice(2)}&time=${h12}%3A${gmi}${ap}`]
   ]}
 const short=c=>c?(c.geo?c[0]:c[0].split(" ")[0]):"";
 // Tra địa điểm bất kỳ qua OpenStreetMap, gán sân bay/tàu theo thành phố lớn gần nhất
