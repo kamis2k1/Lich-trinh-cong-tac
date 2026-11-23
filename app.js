@@ -28,7 +28,7 @@ function find(q){q=q.trim();const n=norm(q);const a=alias[n]||alias[n.replace(/^
   return C.find(c=>(n&&(norm(c[0])===n||norm(c[0].split(" ")[0])===n||c[1].toLowerCase()===n))||(a&&c[0]===a))
     ||C.find(c=>/[^\x00-\u024f]/.test(q)&&c[0].includes(q))
     ||C.find(c=>n.length>2&&norm(c[0]).includes(n))}
-document.getElementById("cities").innerHTML=C.map(c=>`<option value="${c[0]}">`).join("");
+
 
 const $=id=>document.getElementById(id);
 const today=new Date();const iso=d=>d.toISOString().slice(0,10);
@@ -64,12 +64,28 @@ function routeLinks(from,to,fromJa,toJa,date,mode,t,legH){
   ]}
 const short=c=>c?(c.geo?c[0]:c[0].split(" ")[0]):"";
 // Tra địa điểm bất kỳ qua OpenStreetMap, gán sân bay/tàu theo thành phố lớn gần nhất
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch{return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+// Địa điểm đã nhập gần đây
+function recentPlaces(){return store.get("places")||[]}
+function addPlaces(...ps){let r=recentPlaces();for(const p of ps){if(!p)continue;r=r.filter(x=>x.toLowerCase()!==p.toLowerCase());r.unshift(p)}store.set("places",r.slice(0,12));renderPlaces()}
+function renderPlaces(){
+  const r=recentPlaces();
+  document.getElementById("cities").innerHTML=[...r,...C.map(c=>c[0]).filter(n=>!r.includes(n))].map(n=>`<option value="${esc(n)}">`).join("");
+  for(const id of ["from","to"]){const box=document.getElementById(id+"Recent");if(!box)continue;
+    box.innerHTML=r.length?r.slice(0,6).map(p=>`<button type="button" class="chip" data-f="${id}" data-v="${esc(p)}">${esc(p)}</button>`).join(""):""}
+}
+document.addEventListener("click",e=>{const b=e.target.closest(".chip");if(b){document.getElementById(b.dataset.f).value=b.dataset.v}
+  if(e.target.id==="swap"){const f=document.getElementById("from"),t=document.getElementById("to");[f.value,t.value]=[t.value,f.value]}});
 async function geocode(q){
   try{
-    const r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&namedetails=1&accept-language=vi&q="+encodeURIComponent(q));
-    const j=await r.json();if(!j.length)return null;
-    const g=j[0],cc=((g.address&&g.address.country_code)||"").toUpperCase();
-    const c=[q,"",+g.lat,+g.lon,0,cc];c.geo=true;c.acc=0;c.ja=(g.namedetails&&(g.namedetails["name:ja"]||g.namedetails.name))||"";
+    const key="geo:"+q.trim().toLowerCase();let g=store.get(key);
+    if(!g){
+      const r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&namedetails=1&accept-language=vi&q="+encodeURIComponent(q));
+      const j=await r.json();if(!j.length)return null;const x=j[0];
+      g={lat:+x.lat,lon:+x.lon,cc:((x.address&&x.address.country_code)||"").toUpperCase(),ja:(x.namedetails&&(x.namedetails["name:ja"]||x.namedetails.name))||""};
+      store.set(key,g);
+    }
+    const cc=g.cc,c=[q,"",g.lat,g.lon,0,cc];c.geo=true;c.acc=0;c.ja=g.ja;
     const near=C.filter(x=>x[5]===cc).map(x=>[x,km(c,x)]).sort((a,b)=>a[1]-b[1]);
     const ap=near.find(([x])=>x[1]);
     if(ap&&ap[1]<120){c[1]=ap[0][1];c.acc=ap[1]*1.3/45;c.apName=short(ap[0]);c.apKm=ap[1]}
@@ -94,7 +110,7 @@ function transportOptions(A,B){
     const acc=(A.acc||0)+(B.acc||0),accOk=(A.acc||0)<1.6&&(B.acc||0)<1.6;
     const accTxt=acc>0.3?` Cộng thêm ~${fmtH(acc)} đi từ/đến sân bay gần nhất${A.apName&&A.geo?` (${A.apName})`:""}${B.apName&&B.geo?` (${B.apName})`:""}.`:"";
     if(A[1]&&B[1]&&A[1]!==B[1]&&dist>(A.geo||B.geo?500:350)&&accOk) opts.push({k:"fly",n:"Máy bay (ANA/JAL/Peach)",t:dist/700+2.2+acc,ccy:"JPY",p:9000+dist*14,d:`Bay ~${fmtH(dist/700+.3)}, cộng khoảng 2 giờ làm thủ tục.`+accTxt});
-    if((A.geo||B.geo)&&!(A[4]&&B[4])) opts.push({k:"train",n:road>200?"Tàu JR + Shinkansen":"Tàu JR",t:road/(road>600?160:road>200?100:65)+.5,ccy:"JPY",p:800+road*(road>200?40:22),d:"Có thể phải đổi tàu hoặc nối xe buýt. Bấm Yahoo!乗換案内 bên dưới để xem giờ tàu, giá và chỗ đổi tàu chính xác."});
+    if((A.geo||B.geo)&&!(A[4]&&B[4])) opts.push({k:"train",n:road>200?"Tàu JR + Shinkansen":"Tàu JR",t:road/(road>600?160:road>200?100:65)+(road>200?1.2:.6),ccy:"JPY",p:800+road*(road>600?27:road>200?40:22),d:"Đã cộng ~1 giờ đổi tàu và chờ xe. Bấm Yahoo!乗換案内 bên dưới để xem giờ tàu, giá và chỗ đổi tàu chính xác."});
     else if(A[4]&&B[4]) opts.push({k:"train",n:"Shinkansen",t:road/200+.4,ccy:"JPY",p:1500+road*24,d:"Tàu cao tốc, đến thẳng ga trung tâm. Đặt chỗ ngồi chỉ định trên smart EX hoặc Eki-net."});
     else if(road<700&&!(A.geo||B.geo)) opts.push({k:"train",n:"Tàu JR tốc hành",t:road/85+.3,ccy:"JPY",p:800+road*22,d:"Tàu tốc hành (limited express), mua vé trên app JR hoặc tại ga."});
     if(road<1000) opts.push({k:"bus",n:"Xe buýt đường dài (Willer, JR Bus)",t:road/70,ccy:"JPY",p:1500+road*9,d:road>350?"Có chuyến chạy đêm, tiết kiệm tiền khách sạn.":"Rẻ, nhưng có thể chậm do kẹt xe cao tốc."});
@@ -151,6 +167,7 @@ async function build(){
   if(!A||!B){$("err").textContent="Đang tìm địa điểm...";
     if(!A)A=await geocode(fromT);if(!B){if(!A||A.geo)await new Promise(r=>setTimeout(r,1100));B=await geocode(toT)}
     $("err").textContent=(!A||!B)?"Không tìm thấy "+(!A?fromT:toT)+", thử ghi rõ hơn (VD: Sasebo, Nagasaki).":"";}
+  if(A&&B)addPlaces(fromT,toT);
   const nights=Math.round((new Date(d2)-new Date(d1))/864e5);
   CUR=(A&&A[5]==="JP")||(!A&&B&&B[5]==="JP")?"JPY":"VND";
   const jpDest=B&&B[5]==="JP",intl=A&&B&&A[5]!==B[5];
@@ -206,7 +223,7 @@ function renderSaved(){const s=loadSaved();$("saved").innerHTML=s.length?s.map((
 $("save").onclick=()=>{const s=loadSaved();s.unshift({fromT:cur.fromT,toT:cur.toT,d1:cur.d1,d2:cur.d2,m1:cur.m1,t1:cur.t1,m2:cur.m2,t2:cur.t2,pax:cur.pax,pref:cur.pref,note:cur.note});try{localStorage.setItem("trips",JSON.stringify(s.slice(0,20)));$("msg").textContent="Đã lưu.";}catch{$("msg").textContent="Không lưu được trên trình duyệt này."}renderSaved()};
 $("saved").onclick=e=>{const s=loadSaved();if(e.target.dataset.i){const t=s[e.target.dataset.i];$("from").value=t.fromT;$("to").value=t.toT;$("d1").value=t.d1;$("d2").value=t.d2;if(t.t1){$("m1").value=t.m1;$("t1").value=t.t1;$("m2").value=t.m2;$("t2").value=t.t2}$("pax").value=t.pax;$("pref").value=t.pref;$("note").value=t.note||"";build()}
   if(e.target.dataset.del){s.splice(+e.target.dataset.del,1);try{localStorage.setItem("trips",JSON.stringify(s))}catch{}renderSaved()}};
-renderSaved();
+renderSaved();renderPlaces();
 
 let sample=null;$("aiCard").classList.add("hidden");
 (async()=>{try{if(window.claude&&claude.use){sample=await claude.use("sample");if(sample)$("aiCard").classList.remove("hidden")}}catch{}})();
