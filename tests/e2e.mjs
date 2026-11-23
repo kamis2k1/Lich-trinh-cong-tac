@@ -213,6 +213,44 @@ await test("Mọi link ngoài mở tab mới an toàn và là link http(s) hợp
   ok(!bad.length, "link lỗi: " + bad.slice(0, 3));
 });
 
+// 9. Chốt giờ thật từ Yahoo
+const YAHOO_TXT = "ルート1\n早楽\n08:06発→13:34着5時間28分（乗車4時間35分）\n乗換：2回\nIC優先：18,070円（乗車券12,100円　特別料金5,970円）\n08:06 発 佐世保\nＪＲ特急みどり10号\n博多\nＪＲ新幹線のぞみ20号\n福山\n高速バス・瀬戸内しまなみリーディング・しまなみライナー";
+await test("Dán kết quả Yahoo → tự điền giờ 08:06/13:34, giá 18070, tên tàu", async p => {
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  await p.click('.leg[data-leg="go"] summary'); await p.fill('.leg[data-leg="go"] .rpaste', YAHOO_TXT);
+  ok(await p.inputValue('.leg[data-leg="go"] .rdep') === "08:06", "giờ đi"); ok(await p.inputValue('.leg[data-leg="go"] .rarr') === "13:34", "giờ đến");
+  ok(await p.inputValue('.leg[data-leg="go"] .rfare') === "18070", "giá"); ok(/みどり/.test(await p.inputValue('.leg[data-leg="go"] .rline')), "tên tàu");
+});
+await test("Lưu giờ thật → lịch trình, phần đầu trang dùng đúng giờ Yahoo, còn sau khi tải lại", async p => {
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  await p.click('.leg[data-leg="go"] summary'); await p.fill('.leg[data-leg="go"] .rpaste', YAHOO_TXT); await p.click('.leg[data-leg="go"] .rsave');
+  await p.waitForSelector('.leg[data-leg="go"].done');
+  let plan = await p.textContent("#plan"); ok(/08:06\s*khởi hành từ Sasebo station/.test(plan) && /lúc 13:34/.test(plan), plan.slice(0, 160));
+  const hero = await p.textContent("#hero"); ok(/08:06/.test(hero) && /13:34/.test(hero) && /Giờ thật/.test(hero) && /18,070/.test(hero), hero);
+  await p.reload(); const r = await search(p, { ...T, from: "Sasebo station", to: "Imabari station" }); ok(/lúc 13:34/.test(r.plan), "mất sau khi tải lại");
+  await p.click('.leg[data-leg="go"] summary'); await p.click('.leg[data-leg="go"] .rclear'); await p.waitForSelector('.leg[data-leg="go"]:not(.done)');
+  ok(!/lúc 13:34/.test(await p.textContent("#plan")), "chưa xoá giờ thật");
+});
+await test("Lượt về chốt giờ riêng, không ảnh hưởng lượt đi", async p => {
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  await p.click('.leg[data-leg="back"] summary'); await p.fill('.leg[data-leg="back"] .rdep', "15:10"); await p.fill('.leg[data-leg="back"] .rarr', "20:45"); await p.click('.leg[data-leg="back"] .rsave');
+  await p.waitForSelector('.leg[data-leg="back"].done'); const plan = await p.textContent("#plan");
+  ok(/15:10\s*khởi hành về.*lúc 20:45/.test(plan), plan.slice(-160)); ok(!(await p.$('.leg[data-leg="go"].done')), "lượt đi bị đánh dấu");
+});
+await test("Chốt giờ thiếu hoặc giá vé có chữ → báo lỗi, không lưu", async p => {
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  await p.click('.leg[data-leg="go"] summary'); await p.fill('.leg[data-leg="go"] .rdep', "08:06"); await p.click('.leg[data-leg="go"] .rsave');
+  ok(/giờ đi và giờ đến/.test(await p.textContent('.leg[data-leg="go"] .rerr')), "không báo thiếu giờ");
+  await p.fill('.leg[data-leg="go"] .rarr', "13:34"); await p.fill('.leg[data-leg="go"] .rfare', "abc"); await p.click('.leg[data-leg="go"] .rsave');
+  ok(/chữ số/.test(await p.textContent('.leg[data-leg="go"] .rerr')), "không báo giá sai"); ok(!(await p.$(".leg.done")), "vẫn lưu");
+});
+await test("Tên tuyến chèn mã → hiện dạng chữ", async p => {
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  await p.click('.leg[data-leg="go"] summary'); await p.fill('.leg[data-leg="go"] .rdep', "08:06"); await p.fill('.leg[data-leg="go"] .rarr', "13:34");
+  await p.fill('.leg[data-leg="go"] .rline', '<img src=x onerror="window.__z=1">'); await p.click('.leg[data-leg="go"] .rsave'); await p.waitForSelector(".leg.done");
+  ok(!(await p.evaluate(() => window.__z)), "mã đã chạy!");
+});
+
 await browser.close();
 const pass = results.filter(r => r[0]).length;
 for (const r of results) console.log((r[0] ? "✓ " : "✗ ") + r[1] + (r[2] ? "  → " + r[2] : ""));

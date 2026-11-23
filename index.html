@@ -103,6 +103,14 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
 .saved .s b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .saved button{padding:6px 12px;min-height:34px;font-size:.82rem}
 .ai{white-space:pre-wrap}
+.leg.done{border-color:var(--ok)}
+.realbox{background:var(--ok-soft);color:var(--ok);padding:8px 10px;border-radius:8px;margin-bottom:8px;font-size:.9rem;overflow-wrap:anywhere}
+.realbox b{font-variant-numeric:tabular-nums}
+.okb{display:inline-block;background:var(--ok);color:#fff;border-radius:99px;padding:1px 8px;font-size:.75rem;font-weight:700}
+@media (prefers-color-scheme:dark){.okb{color:#0f1318}}
+.fix{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
+.lab{display:block;margin-top:8px;text-transform:none;letter-spacing:0;font-size:.8rem}
+.lab input,.lab textarea{margin-top:4px;font-size:1rem}
 </style>
 </head>
 <body>
@@ -154,6 +162,6 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
 
   <div class="card" id="savedCard"><h2>☆ Chuyến đã lưu</h2><ul id="saved" class="saved"><li class="muted">Chưa có chuyến nào.</li></ul></div>
 </div>
-<script src="app.js?v=14"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>
