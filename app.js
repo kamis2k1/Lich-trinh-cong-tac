@@ -179,16 +179,21 @@ async function build(){
   const ref=o=>o.ccy==="JPY"?o.p:o.p/JPY2VND;
   const score=o=>o.t==null?0:pref==="fast"?o.t:pref==="cheap"?ref(o):(o.k==="fly"?o.t*0.8:o.k==="train"&&jpDest?o.t*0.7:o.k==="car"?o.t*0.9:o.t*1.3);
   opts.sort((a,b)=>score(a)-score(b));cur.opts=opts;cur.dist=dist;
-  $("opts").innerHTML=(dist?`<p class="muted">Khoảng cách đường chim bay ~${Math.round(dist)} km.${intl?` Giá quy đổi theo tỉ giá ước tính 1¥ ≈ ${JPY2VND}đ.`:""}</p>`:"")+opts.map((o,i)=>`<div class="opt"><div><b>${o.n}${i===0?'<span class="tag best">Phù hợp nhất</span>':''}</b><span class="muted">${o.d}</span></div><div style="text-align:right">${o.t!=null?`<b>${fmtH(o.t)}</b><span class="muted">~${money(o.p*pax,o.ccy)} / chiều${pax>1?` (${pax} người)`:''}</span>`:''}</div></div>`).join("");
+  const IC={fly:"✈️",train:"🚄",bus:"🚌",car:"🚗"};
+  $("opts").innerHTML=(dist?`<p class="muted" style="margin:0">Đường chim bay ~${Math.round(dist)} km${intl?` · 1¥ ≈ ${JPY2VND}đ`:""}</p>`:"")+opts.map((o,i)=>`<div class="opt${i===0?" best":""}"><div class="ic">${IC[o.k]||"🧭"}</div><div><b>${o.n}${i===0?'<span class="tag">Phù hợp nhất</span>':''}</b><span class="muted">${o.d}</span></div><div class="r">${o.t!=null?`<b>${fmtH(o.t)}</b><div class="muted">~${money(o.p*pax,o.ccy)}${pax>1?` · ${pax} người`:''}</div>`:''}</div></div>`).join("");
 
   const L=bookingLinks(A,B,fromT,toT,d1,d2,pax,opts);
   let legHtml="";const best0=opts[0];
   if(A&&B&&A[5]==="JP"&&B[5]==="JP"){
     const fj=jaName(A,fromT),tj=jaName(B,toT);
-    const leg=(lbl,f,t,fJ,tJ,date,mode,tm)=>`<div class="leg"><b>${lbl}: ${mode==="arr"?"đến trước":"khởi hành"} ${tm}, ${dmy(date)}</b>${routeLinks(f,t,fJ,tJ,date,mode,tm,best0.t).map(l=>`<a href="${l[1]}" target="_blank" rel="noopener">${l[0]} ↗</a>`).join("")}</div>`;
-    legHtml=`<p class="muted" style="margin:0 0 6px">Giờ tàu thật theo giờ bạn chọn:</p>`+leg("Lượt đi",fromT,toT,fj,tj,d1,m1,t1)+leg("Lượt về",toT,fromT,tj,fj,d2,m2,t2)+`<p class="muted" style="margin:4px 0 6px">Đặt vé và phòng:</p>`;
+    const leg=(lbl,f,t,fJ,tJ,date,mode,tm)=>`<div class="leg"><div class="h">${lbl} · ${dmy(date)} · ${mode==="arr"?"đến trước":"khởi hành"} ${tm}</div><div class="btns">${routeLinks(f,t,fJ,tJ,date,mode,tm,best0.t).map((l,k)=>`<a class="${k===0?"pri":""}" href="${l[1]}" target="_blank" rel="noopener">${l[0].replace("★ ","").replace(" (giờ tàu chính xác)","")}</a>`).join("")}</div></div>`;
+    legHtml=leg("Lượt đi",fromT,toT,fj,tj,d1,m1,t1)+leg("Lượt về",toT,fromT,tj,fj,d2,m2,t2)+`<p class="note">Yahoo!乗換案内 cho giờ tàu, giá và chỗ đổi tàu chính xác theo ngày giờ bạn chọn.</p>`;
   }
-  $("links").innerHTML=legHtml+L.map(l=>`<a href="${l[1]}" target="_blank" rel="noopener">${l[0]} ↗</a>`).join("");
+  $("legs").innerHTML=legHtml;$("legCard").classList.toggle("hidden",!legHtml);
+  const grp={route:[],ticket:[],hotel:[]};
+  for(const l of L){(/Khách sạn/.test(l[0])?grp.hotel:/NAVITIME|Chỉ đường|lộ trình/i.test(l[0])?grp.route:grp.ticket).push(l)}
+  const glist=(t,a)=>a.length?`<div class="grp"><div class="lbl">${t}</div><div class="list">${a.map(l=>`<a href="${l[1]}" target="_blank" rel="noopener">${l[0].replace(/^Khách sạn - /,"")}</a>`).join("")}</div></div>`:"";
+  $("links").innerHTML=glist("Vé tàu, xe, máy bay",grp.ticket)+glist("Khách sạn",grp.hotel)+glist("Tra đường",grp.route);
 
   const best=opts[0],fN=A?short(A):fromT,tN=B?short(B):toT,days=[];
   const via=best.n.replace(/\s*\(.*\)/,"");const viaL=/^[A-Z]{2}|Shinkansen/.test(via.split(" ")[0])?via:via.charAt(0).toLowerCase()+via.slice(1);
@@ -210,7 +215,11 @@ async function build(){
   }
   if(note) days[Math.min(1,nights)].items.splice(1,0,"Ghi chú: "+note);
   cur.days=days;
-  $("plan").innerHTML=days.map((d,i)=>`<div class="day"><h3>Ngày ${i+1} · ${d.label}</h3><ul>${d.items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`).join("");
+  $("plan").innerHTML=days.map((d,i)=>`<div class="day"><h3>Ngày ${i+1} · ${d.label}</h3><ul class="tl">${d.items.map(x=>{const m=x.match(/^(\d\d:\d\d)\s+(.*)$/);return m?`<li class="tt"><span class="when">${m[1]}</span>${esc(m[2])}</li>`:`<li>${esc(x)}</li>`}).join("")}</ul></div>`).join("");
+  // 2 hero
+  const bt=best.t!=null;
+  $("hero").innerHTML=`<div class="od">${esc(fromT)} → ${esc(toT)}</div><div class="sub">${dmy(d1)} – ${dmy(d2)} · ${nights?nights+" đêm":"trong ngày"} · ${pax} người</div>`+
+    (bt?`<div class="big"><span class="t">${go.dep.slice(0,5)}</span><div class="line"><span>${(IC[best.k]||"")} ${fmtH(best.t)}</span></div><span class="t">${go.arr.slice(0,5)}</span></div><div class="sub">Lượt đi bằng ${esc(best.n)} · ~${money(best.p*pax,best.ccy)} · giờ đến là ước tính</div>`:"");
   $("ai").textContent="";$("msg").textContent="";
   $("out").classList.remove("hidden");$("out").scrollIntoView({behavior:"smooth"});
 }
@@ -219,7 +228,7 @@ function asText(){if(!cur)return"";return `Lịch trình công tác ${cur.fromT}
 $("copy").onclick=async()=>{try{await navigator.clipboard.writeText(asText());$("msg").textContent="Đã sao chép."}catch{$("msg").textContent="Trình duyệt chặn sao chép, hãy bôi đen để copy."}};
 
 function loadSaved(){try{return JSON.parse(localStorage.getItem("trips")||"[]")}catch{return[]}}
-function renderSaved(){const s=loadSaved();$("saved").innerHTML=s.length?s.map((t,i)=>`<li>${esc(t.fromT)} → ${esc(t.toT)}, ${dmy(t.d1)} - ${dmy(t.d2)} <button class="ghost" data-i="${i}">Mở</button> <button class="ghost" data-del="${i}">Xoá</button></li>`).join(""):'<li class="muted">Chưa có chuyến nào.</li>'}
+function renderSaved(){const s=loadSaved();$("saved").innerHTML=s.length?s.map((t,i)=>`<li><div class="s"><b>${esc(t.fromT)} → ${esc(t.toT)}</b><span class="muted">${dmy(t.d1)} – ${dmy(t.d2)}</span></div><button class="ghost" data-i="${i}">Mở</button><button class="ghost" data-del="${i}" aria-label="Xoá">✕</button></li>`).join(""):'<li class="muted">Chưa có chuyến nào.</li>'}
 $("save").onclick=()=>{const s=loadSaved();s.unshift({fromT:cur.fromT,toT:cur.toT,d1:cur.d1,d2:cur.d2,m1:cur.m1,t1:cur.t1,m2:cur.m2,t2:cur.t2,pax:cur.pax,pref:cur.pref,note:cur.note});try{localStorage.setItem("trips",JSON.stringify(s.slice(0,20)));$("msg").textContent="Đã lưu.";}catch{$("msg").textContent="Không lưu được trên trình duyệt này."}renderSaved()};
 $("saved").onclick=e=>{const s=loadSaved();if(e.target.dataset.i){const t=s[e.target.dataset.i];$("from").value=t.fromT;$("to").value=t.toT;$("d1").value=t.d1;$("d2").value=t.d2;if(t.t1){$("m1").value=t.m1;$("t1").value=t.t1;$("m2").value=t.m2;$("t2").value=t.t2}$("pax").value=t.pax;$("pref").value=t.pref;$("note").value=t.note||"";build()}
   if(e.target.dataset.del){s.splice(+e.target.dataset.del,1);try{localStorage.setItem("trips",JSON.stringify(s))}catch{}renderSaved()}};

@@ -3,86 +3,149 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b57d0">
 <title>Lên lịch trình công tác</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
 <style>
-:root{--bg:#f5f6f8;--card:#fff;--ink:#1c2430;--muted:#5d6878;--line:#e2e6ec;--accent:#0b6bcb;--accent-soft:#e7f1fb;--ok:#1f7a4d}
-@media (prefers-color-scheme:dark){:root{--bg:#12161c;--card:#1b2129;--ink:#e8ecf1;--muted:#9aa5b4;--line:#2c3440;--accent:#5aa9f0;--accent-soft:#1d2b3a;--ok:#5cc28d}}
+:root{--bg:#f2f4f7;--card:#fff;--ink:#1a1f27;--muted:#5f6b7a;--line:#e3e7ed;--accent:#0b57d0;--accent-soft:#e8f0fe;--ok:#137333;--ok-soft:#e6f4ea;--warn:#b06000;--r:16px}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1318;--card:#1a1f26;--ink:#e8ecf1;--muted:#9aa5b4;--line:#2b333e;--accent:#8ab4f8;--accent-soft:#1f2a3a;--ok:#81c995;--ok-soft:#1b2e22;--warn:#fdd663}}
 *{box-sizing:border-box}
-body{margin:0;font-family:"Be Vietnam Pro",system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
-.wrap{max-width:960px;margin:0 auto;padding:24px 16px 60px}
-h1{font-size:1.6rem;margin:0 0 4px}
-.sub{color:var(--muted);margin:0 0 20px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
-label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:4px;font-weight:500}
-input,select,textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--card);color:var(--ink)}
-textarea{min-height:60px;resize:vertical}
-button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:10px 16px;font-weight:600}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:"Be Vietnam Pro",system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45;font-size:15px}
+.top{background:var(--accent);color:#fff;padding:18px 16px 64px}
+@media (prefers-color-scheme:dark){.top{background:#1d3b6e}}
+.top h1{margin:0;font-size:1.25rem;font-weight:700}
+.top p{margin:2px 0 0;opacity:.85;font-size:.85rem}
+.wrap{max-width:720px;margin:-52px auto 0;padding:0 12px 40px}
+.card{background:var(--card);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+h2{font-size:1.05rem;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+label,.lbl{display:block;font-size:.75rem;color:var(--muted);font-weight:600;margin-bottom:4px;text-transform:uppercase;letter-spacing:.02em}
+input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:var(--card);color:var(--ink);min-height:44px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+textarea{min-height:64px;resize:vertical}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:10px 14px;font-weight:600;min-height:40px}
 .primary{background:var(--accent);color:#fff}
+@media (prefers-color-scheme:dark){.primary{color:#0f1318}}
 .ghost{background:var(--accent-soft);color:var(--accent)}
-.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center}
-h2{font-size:1.15rem;margin:0 0 12px}
-.opt{display:grid;grid-template-columns:1fr auto;gap:8px;padding:12px 0;border-top:1px solid var(--line)}
-.opt:first-of-type{border-top:0}
+.muted{color:var(--muted);font-size:.85rem}
+.hidden{display:none!important}
+/* Ô điểm đi / điểm đến */
+.route{position:relative;border:1px solid var(--line);border-radius:12px}
+.route .f{display:flex;align-items:flex-start;gap:10px;padding:8px 52px 8px 12px}
+.route .f+.f{border-top:1px solid var(--line)}
+.route .dot{width:12px;height:12px;border-radius:50%;border:3px solid var(--accent);margin-top:28px;flex:none}
+.route .f+.f .dot{background:var(--accent)}
+.route .f>div{flex:1;min-width:0}
+.route input{border:0;padding:4px 0;min-height:34px;font-size:1rem;font-weight:500}
+.route input:focus{outline:0}
+#swap{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:40px;height:40px;padding:0;border-radius:50%;background:var(--card);border:1px solid var(--line);color:var(--accent);font-size:1.15rem}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:3px 10px;min-height:28px;font-size:.78rem;font-weight:500;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.tm{display:flex;gap:6px}.tm select{flex:1.25;padding-left:8px;padding-right:4px}.tm input{flex:1;padding-left:8px;padding-right:4px}
+@media (max-width:480px){.g2.t{grid-template-columns:1fr}}
+details{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-weight:600;color:var(--accent);font-size:.9rem;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
+.go{width:100%;margin-top:14px;padding:14px;font-size:1rem;border-radius:12px}
+.err{color:#d93025;font-size:.85rem;margin-top:8px;min-height:1em}
+/* Kết quả */
+.hero .od{font-size:1.1rem;font-weight:700}
+.hero .sub{color:var(--muted);font-size:.85rem}
+.big{display:flex;align-items:center;gap:10px;margin:12px 0 4px}
+.big .t{font-size:1.6rem;font-weight:700;font-variant-numeric:tabular-nums}
+.big .line{flex:1;border-top:2px dashed var(--line);position:relative;text-align:center}
+.big .line span{position:relative;top:-11px;background:var(--card);padding:0 6px;font-size:.78rem;color:var(--muted)}
+.opt{display:grid;grid-template-columns:40px 1fr auto;gap:10px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:12px;margin-top:8px}
+.opt.best{border-color:var(--ok);background:var(--ok-soft)}
+.opt .ic{font-size:1.5rem;text-align:center}
 .opt b{display:block}
-.tag{display:inline-block;font-size:.75rem;padding:2px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent);margin-left:6px;font-weight:600}
-.best{background:#e3f5ec;color:var(--ok)}
-@media (prefers-color-scheme:dark){.best{background:#1b3428}}
-.muted{color:var(--muted);font-size:.9rem}
-.links a{display:inline-block;margin:4px 6px 4px 0;padding:7px 12px;border-radius:8px;border:1px solid var(--line);color:var(--accent);text-decoration:none;font-weight:500;font-size:.9rem}
-.links a:hover{background:var(--accent-soft)}
-.day{border-left:3px solid var(--accent);padding:4px 0 10px 14px;margin-left:4px}
-.day h3{margin:0 0 4px;font-size:1rem}
-.day ul{margin:4px 0 0;padding-left:18px}
-.err{color:#c0392b;margin-top:8px}
-.hidden{display:none}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chip{padding:4px 10px;font-size:.8rem;font-weight:500;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
-.tm{display:flex;gap:6px}.tm select{flex:1.3}.tm input{flex:1}
-.leg{margin:2px 0 10px}.leg b{display:block;font-size:.9rem;margin-bottom:2px}
+.opt .r{text-align:right;white-space:nowrap}
+.opt .r b{font-size:1rem}
+.tag{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:99px;background:var(--ok);color:#fff;margin-left:6px;vertical-align:2px;font-weight:600}
+@media (prefers-color-scheme:dark){.tag{color:#0f1318}}
+.note{font-size:.78rem;color:var(--muted);margin:10px 0 0}
+.leg{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:8px}
+.leg .h{font-weight:600;margin-bottom:8px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btns a{flex:1 1 auto;text-align:center;padding:10px 12px;border-radius:10px;background:var(--accent-soft);color:var(--accent);text-decoration:none;font-weight:600;font-size:.88rem}
+.btns a.pri{background:var(--accent);color:#fff}
+@media (prefers-color-scheme:dark){.btns a.pri{color:#0f1318}}
+.grp{margin-top:14px}
+.grp .lbl{margin-bottom:6px}
+.list a{display:flex;align-items:center;justify-content:space-between;padding:12px 4px;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:500}
+.list a:last-child{border-bottom:0}
+.list a:after{content:"↗";color:var(--accent);font-weight:700}
+/* Dòng thời gian */
+.day{margin-top:14px}
+.day:first-child{margin-top:0}
+.day h3{font-size:.9rem;margin:0 0 6px;color:var(--accent)}
+.tl{list-style:none;margin:0;padding:0 0 0 18px;border-left:2px solid var(--line);margin-left:6px}
+.tl li{position:relative;padding:4px 0 10px 6px}
+.tl li:before{content:"";position:absolute;left:-25px;top:9px;width:10px;height:10px;border-radius:50%;background:var(--card);border:2px solid var(--accent)}
+.tl li.tt:before{background:var(--accent)}
+.tl .when{font-weight:700;font-variant-numeric:tabular-nums;margin-right:6px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.saved{list-style:none;margin:0;padding:0}
+.saved li{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+.saved li:last-child{border-bottom:0}
+.saved .s{flex:1;min-width:0}
+.saved .s b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.saved button{padding:6px 12px;min-height:34px;font-size:.82rem}
 .ai{white-space:pre-wrap}
-.saved li{margin:4px 0}
-.saved button{padding:4px 10px;font-size:.8rem}
 </style>
 </head>
 <body>
+<header class="top">
+  <h1>🧳 Lịch trình công tác</h1>
+  <p>Nhật Bản · Việt Nam · Nhật ⇄ Việt</p>
+</header>
 <div class="wrap">
-  <h1>Lên lịch trình đi công tác</h1>
-  <p class="sub">Nhập ngày đi, ngày về, điểm đi và điểm đến. Hỗ trợ chặng trong Nhật Bản, trong Việt Nam và Nhật ⇄ Việt Nam. Trang sẽ gợi ý phương tiện, lập lịch trình theo ngày và mở sẵn trang đặt vé với thông tin đã điền.</p>
-
-  <form id="f" class="card">
-    <div class="grid">
-      <div><label for="from">Điểm đi</label><input id="from" list="cities" required autocomplete="off" placeholder="VD: Tokyo, Hà Nội"><div class="chips" id="fromRecent"></div></div>
-      <div><label for="to">Điểm đến</label><input id="to" list="cities" required autocomplete="off" placeholder="VD: Osaka, Đà Nẵng"><div class="chips" id="toRecent"></div></div>
+  <form id="f" class="card" autocomplete="off">
+    <div class="route">
+      <div class="f"><span class="dot"></span><div><label for="from">Điểm đi</label><input id="from" list="cities" required placeholder="Ga, thành phố… (VD: Sasebo)"><div class="chips" id="fromRecent"></div></div></div>
+      <div class="f"><span class="dot"></span><div><label for="to">Điểm đến</label><input id="to" list="cities" required placeholder="VD: Imabari station, Osaka"><div class="chips" id="toRecent"></div></div></div>
+      <button type="button" id="swap" title="Đổi chiều đi/đến" aria-label="Đổi chiều đi và đến">⇅</button>
+    </div>
+    <div class="g2">
       <div><label for="d1">Ngày đi</label><input id="d1" type="date" required></div>
       <div><label for="d2">Ngày về</label><input id="d2" type="date" required></div>
+    </div>
+    <div class="g2 t">
       <div><label for="t1">Giờ lượt đi</label><div class="tm"><select id="m1" aria-label="Kiểu giờ lượt đi"><option value="dep">Khởi hành lúc</option><option value="arr">Đến nơi trước</option></select><input id="t1" type="time" value="08:00"></div></div>
       <div><label for="t2">Giờ lượt về</label><div class="tm"><select id="m2" aria-label="Kiểu giờ lượt về"><option value="dep">Khởi hành lúc</option><option value="arr">Về đến trước</option></select><input id="t2" type="time" value="17:00"></div></div>
-      <div><label for="pax">Số người</label><input id="pax" type="number" min="1" max="9" value="1"></div>
-      <div><label for="pref">Ưu tiên</label>
-        <select id="pref"><option value="fast">Nhanh nhất</option><option value="cheap">Tiết kiệm</option><option value="comfort">Thoải mái</option></select></div>
     </div>
-    <div style="margin-top:12px"><label for="note">Công việc / ghi chú (tuỳ chọn)</label>
-      <textarea id="note" placeholder="VD: Họp khách hàng 10h sáng ngày 2 gần ga Umeda, cần khách sạn gần ga"></textarea></div>
-    <div class="row"><button class="primary" type="submit">Lập lịch trình</button><button class="ghost" type="button" id="swap">⇄ Đổi chiều đi/đến</button><span id="err" class="err"></span></div>
+    <details>
+      <summary>Tuỳ chọn thêm</summary>
+      <div class="g2">
+        <div><label for="pax">Số người</label><input id="pax" type="number" min="1" max="9" value="1" inputmode="numeric"></div>
+        <div><label for="pref">Ưu tiên</label><select id="pref"><option value="fast">Nhanh nhất</option><option value="cheap">Rẻ nhất</option><option value="comfort">Thoải mái</option></select></div>
+      </div>
+      <div style="margin-top:10px"><label for="note">Công việc / ghi chú</label><textarea id="note" placeholder="VD: Họp khách hàng 10h sáng ngày 2 gần ga, cần khách sạn gần ga"></textarea></div>
+    </details>
+    <button class="primary go" type="submit">Tìm lộ trình</button>
+    <div id="err" class="err" role="status"></div>
     <datalist id="cities"></datalist>
   </form>
 
   <div id="out" class="hidden">
-    <div class="card"><h2>Phương tiện gợi ý</h2><div id="opts"></div>
-      <p class="muted">Thời gian và giá là ước tính tham khảo. Giá vé thật hiển thị khi bạn mở trang đặt vé bên dưới.</p></div>
-    <div class="card"><h2>Đặt vé và phòng</h2><div id="links" class="links"></div></div>
-    <div class="card"><h2>Lịch trình theo ngày</h2><div id="plan"></div>
-      <div class="row"><button class="ghost" type="button" id="copy">Sao chép lịch trình</button><button class="ghost" type="button" id="save">Lưu chuyến này</button><span id="msg" class="muted"></span></div></div>
-    <div class="card" id="aiCard"><h2>Gợi ý chi tiết từ Claude</h2>
-      <p class="muted">Claude viết lịch trình chi tiết hơn: giờ bay nên chọn, khu vực ở, mẹo di chuyển nội thành, lưu ý thời tiết.</p>
-      <div class="row"><button class="primary" type="button" id="aiBtn">Nhờ Claude gợi ý</button></div>
+    <div class="card hero" id="hero"></div>
+    <div class="card" id="legCard"><h2>🕒 Giờ tàu thật</h2><div id="legs"></div></div>
+    <div class="card"><h2>🚆 Phương tiện</h2><div id="opts"></div>
+      <p class="note">Thời gian và giá là ước tính theo khoảng cách. Giờ và giá chính xác xem ở mục Giờ tàu thật hoặc trang đặt vé.</p></div>
+    <div class="card"><h2>🎫 Đặt vé &amp; khách sạn</h2><div id="links"></div></div>
+    <div class="card"><h2>📋 Lịch trình</h2><div id="plan"></div>
+      <div class="actions"><button class="ghost" type="button" id="copy">Sao chép</button><button class="ghost" type="button" id="save">☆ Lưu chuyến</button><span id="msg" class="muted"></span></div></div>
+    <div class="card" id="aiCard"><h2>✨ Gợi ý từ Claude</h2>
+      <p class="muted">Lịch trình chi tiết hơn: giờ nên đi, khu vực ở, mẹo di chuyển, thời tiết.</p>
+      <div class="actions"><button class="primary" type="button" id="aiBtn">Nhờ Claude gợi ý</button></div>
       <div id="ai" class="ai" style="margin-top:12px"></div></div>
   </div>
 
-  <div class="card" id="savedCard"><h2>Chuyến đã lưu</h2><ul id="saved" class="saved"><li class="muted">Chưa có chuyến nào.</li></ul></div>
+  <div class="card" id="savedCard"><h2>☆ Chuyến đã lưu</h2><ul id="saved" class="saved"><li class="muted">Chưa có chuyến nào.</li></ul></div>
 </div>
-
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>
