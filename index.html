@@ -42,7 +42,8 @@ button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:10px 14px
 .chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:none;padding:3px 10px;min-height:28px;font-size:.78rem;font-weight:500;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.g2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:12px}.g2>div{min-width:0}
+input[type=date],input[type=time]{min-width:0;max-width:100%;-webkit-appearance:none;appearance:none}
 .tm{display:flex;gap:6px}.tm select{flex:1.25;padding-left:8px;padding-right:4px}.tm input{flex:1;padding-left:8px;padding-right:4px}
 @media (max-width:480px){.g2.t{grid-template-columns:1fr}}
 details{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
@@ -64,6 +65,7 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
 .opt b{display:block}
 .opt .r{text-align:right;white-space:nowrap}
 .opt .r b{font-size:1rem}
+@media (max-width:520px){.opt{grid-template-columns:34px 1fr}.opt .r{grid-column:2;text-align:left;display:flex;gap:10px;align-items:baseline}.opt .r .muted{font-size:.85rem}}
 .tag{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:99px;background:var(--ok);color:#fff;margin-left:6px;vertical-align:2px;font-weight:600}
 @media (prefers-color-scheme:dark){.tag{color:#0f1318}}
 .note{font-size:.78rem;color:var(--muted);margin:10px 0 0}
@@ -146,6 +148,6 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
 
   <div class="card" id="savedCard"><h2>☆ Chuyến đã lưu</h2><ul id="saved" class="saved"><li class="muted">Chưa có chuyến nào.</li></ul></div>
 </div>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>
