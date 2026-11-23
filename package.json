@@ -1,0 +1,13 @@
+{
+  "name": "lich-trinh-cong-tac",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "http-server . -p 8080 -s -c-1",
+    "test": "node tests/e2e.mjs"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "playwright": "^1.63.0"
+  }
+}

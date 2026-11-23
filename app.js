@@ -31,8 +31,15 @@ function find(q){q=q.trim();const n=norm(q);const a=alias[n]||alias[n.replace(/^
 
 
 const $=id=>document.getElementById(id);
-const today=new Date();const iso=d=>d.toISOString().slice(0,10);
-$("d1").value=iso(new Date(today.getTime()+7*864e5));$("d2").value=iso(new Date(today.getTime()+10*864e5));
+// Ngày theo giờ địa phương (không dùng UTC để tránh lệch ngày ở Nhật trước 9h sáng)
+const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const addDays=(s,n)=>{const [y,m,d]=s.split("-").map(Number);return iso(new Date(y,m-1,d+n))};
+const todayStr=()=>iso(new Date());
+const validDate=s=>/^\d{4}-\d{2}-\d{2}$/.test(s)&&addDays(s,0)===s;
+const dayDiff=(a,b)=>{const [y1,m1,d1]=a.split("-").map(Number),[y2,m2,d2]=b.split("-").map(Number);return Math.round((Date.UTC(y2,m2-1,d2)-Date.UTC(y1,m1-1,d1))/864e5)};
+$("d1").value=addDays(todayStr(),7);$("d2").value=addDays(todayStr(),10);
+$("d1").min=todayStr();$("d2").min=$("d1").value;
+$("d1").addEventListener("change",()=>{const v=$("d1").value;if(validDate(v)){$("d2").min=v;if($("d2").value&&$("d2").value<v)$("d2").value=v}});
 
 function km(a,b){const R=6371,r=Math.PI/180,dl=(b[2]-a[2])*r,dg=(b[3]-a[3])*r;
   const h=Math.sin(dl/2)**2+Math.cos(a[2]*r)*Math.cos(b[2]*r)*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
@@ -80,7 +87,8 @@ async function geocode(q){
   try{
     const key="geo:"+q.trim().toLowerCase();let g=store.get(key);
     if(!g){
-      const r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&namedetails=1&accept-language=vi&q="+encodeURIComponent(q));
+      let r;try{r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&namedetails=1&accept-language=vi&q="+encodeURIComponent(q));}catch(e){throw new Error("net")}
+      if(!r.ok)throw new Error("net");
       const j=await r.json();if(!j.length)return null;const x=j[0];
       g={lat:+x.lat,lon:+x.lon,cc:((x.address&&x.address.country_code)||"").toUpperCase(),ja:(x.namedetails&&(x.namedetails["name:ja"]||x.namedetails.name))||""};
       store.set(key,g);
@@ -91,11 +99,20 @@ async function geocode(q){
     if(ap&&ap[1]<120){c[1]=ap[0][1];c.acc=ap[1]*1.3/45;c.apName=short(ap[0]);c.apKm=ap[1]}
     const rail=near.find(([x])=>x[4]);if(rail&&rail[1]<25)c[4]=1;
     return c;
-  }catch(e){return null}
+  }catch(e){if(e.message==="net")throw e;return null}
 }
 
 let cur=null;
 $("f").addEventListener("submit",e=>{e.preventDefault();build()});
+const FIELDS=["from","to","d1","d2","t1","t2","pax"];
+function setErr(msg,ids=[]){
+  $("err").textContent=msg;
+  for(const id of FIELDS)$(id).removeAttribute("aria-invalid");
+  for(const id of ids)$(id).setAttribute("aria-invalid","true");
+  if(msg){$("out").classList.add("hidden");if(ids[0]&&$(ids[0]).focus)$(ids[0]).focus({preventScroll:true});$("err").scrollIntoView&&$("err").scrollIntoView({block:"center",behavior:"smooth"})}
+}
+const clean=s=>s.replace(/[\u0000-\u001f\u007f]/g,"").replace(/\s+/g," ").trim().slice(0,100);
+let busy=false;
 
 function transportOptions(A,B){
   const opts=[];const dist=km(A,B);
@@ -157,18 +174,44 @@ function bookingLinks(A,B,fromT,toT,d1,d2,pax,opts){
 }
 
 async function build(){
-  $("err").textContent="";
-  const m1=$("m1").value,t1=$("t1").value||"08:00",m2=$("m2").value,t2=$("t2").value||"17:00";
-  const fromT=$("from").value.trim(),toT=$("to").value.trim(),d1=$("d1").value,d2=$("d2").value,pax=+$("pax").value||1,pref=$("pref").value,note=$("note").value.trim();
-  if(!fromT||!toT||!d1||!d2){$("err").textContent="Vui lòng nhập đủ 4 thông tin.";return}
-  if(d2<d1){$("err").textContent="Ngày về phải sau hoặc trùng ngày đi.";return}
-  if(norm(fromT)===norm(toT)&&fromT===toT){$("err").textContent="Điểm đi và điểm đến đang trùng nhau.";return}
+  if(busy)return;
+  setErr("");
+  const m1=$("m1").value==="arr"?"arr":"dep",m2=$("m2").value==="arr"?"arr":"dep";
+  const okT=t=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t);
+  const t1=okT($("t1").value)?$("t1").value:"08:00",t2=okT($("t2").value)?$("t2").value:"17:00";
+  const fromT=clean($("from").value),toT=clean($("to").value),d1=$("d1").value,d2=$("d2").value,note=clean($("note").value+"").slice(0,300);
+  const pref=["fast","cheap","comfort"].includes($("pref").value)?$("pref").value:"fast";
+  const miss=[];if(!fromT)miss.push("from");if(!toT)miss.push("to");if(!d1)miss.push("d1");if(!d2)miss.push("d2");
+  const NAME={from:"điểm đi",to:"điểm đến",d1:"ngày đi",d2:"ngày về"};
+  if(miss.length)return setErr("Vui lòng nhập "+miss.map(k=>NAME[k]).join(", ")+".",miss);
+  if(!validDate(d1))return setErr("Ngày đi không hợp lệ.",["d1"]);
+  if(!validDate(d2))return setErr("Ngày về không hợp lệ.",["d2"]);
+  if(d1<todayStr())return setErr("Ngày đi đã qua, hãy chọn từ hôm nay trở đi.",["d1"]);
+  if(d2<d1)return setErr("Ngày về phải sau hoặc trùng ngày đi.",["d2"]);
+  if(dayDiff(d1,d2)>60)return setErr("Chuyến đi dài tối đa 60 ngày.",["d2"]);
+  if(dayDiff(todayStr(),d1)>365)return setErr("Chỉ lập lịch trong vòng 1 năm tới.",["d1"]);
+  const paxRaw=($("pax").value+"").trim(),pax=paxRaw===""?1:Number(paxRaw);
+  if(!Number.isInteger(pax)||pax<1||pax>9){$("more").open=true;return setErr("Số người phải từ 1 đến 9.",["pax"])}
+  if(!/[\p{L}\p{N}]/u.test(fromT))return setErr("Điểm đi không hợp lệ.",["from"]);
+  if(!/[\p{L}\p{N}]/u.test(toT))return setErr("Điểm đến không hợp lệ.",["to"]);
   let A=find(fromT),B=find(toT);
-  if(!A||!B){$("err").textContent="Đang tìm địa điểm...";
-    if(!A)A=await geocode(fromT);if(!B){if(!A||A.geo)await new Promise(r=>setTimeout(r,1100));B=await geocode(toT)}
-    $("err").textContent=(!A||!B)?"Không tìm thấy "+(!A?fromT:toT)+", thử ghi rõ hơn (VD: Sasebo, Nagasaki).":"";}
+  const same=()=>A&&B&&(A===B||km(A,B)<1.5);
+  if(norm(fromT)&&norm(fromT)===norm(toT)||fromT===toT||same())return setErr("Điểm đi và điểm đến đang trùng nhau.",["to"]);
+  if(!A||!B){
+    busy=true;const btn=$("f").querySelector("button[type=submit]");btn.disabled=true;const bt=btn.textContent;btn.textContent="Đang tìm địa điểm…";
+    try{
+      if(!A)A=await geocode(fromT);
+      if(!B){if(!A||A.geo)await new Promise(r=>setTimeout(r,1100));B=await geocode(toT)}
+    }catch(e){return setErr("Không kết nối được dịch vụ bản đồ. Kiểm tra mạng rồi thử lại.")}
+    finally{busy=false;btn.disabled=false;btn.textContent=bt}
+    if(!A)return setErr(`Không tìm thấy "${fromT}". Thử ghi rõ hơn, VD: "Sasebo station" hoặc "佐世保".`,["from"]);
+    if(!B)return setErr(`Không tìm thấy "${toT}". Thử ghi rõ hơn, VD: "Imabari station" hoặc "今治".`,["to"]);
+    if(same())return setErr("Điểm đi và điểm đến đang trùng nhau.",["to"]);
+  }
+  const OK=["JP","VN"];
+  if(!OK.includes(A[5])||!OK.includes(B[5]))return setErr("Hiện chỉ hỗ trợ địa điểm ở Nhật Bản và Việt Nam.",[!OK.includes(A[5])?"from":"to"]);
   if(A&&B)addPlaces(fromT,toT);
-  const nights=Math.round((new Date(d2)-new Date(d1))/864e5);
+  const nights=dayDiff(d1,d2);
   CUR=(A&&A[5]==="JP")||(!A&&B&&B[5]==="JP")?"JPY":"VND";
   const jpDest=B&&B[5]==="JP",intl=A&&B&&A[5]!==B[5];
   cur={fromT,toT,A,B,d1,d2,pax,pref,note,nights,jpDest,intl,m1,t1,m2,t2};
@@ -203,7 +246,7 @@ async function build(){
   const go=legTimes(m1,t1,best.t),back=legTimes(m2,t2,best.t),est=best.t?" (giờ đến là ước tính)":"";
   cur.go=go;cur.back=back;
   for(let i=0;i<=nights;i++){
-    const dt=new Date(d1);dt.setDate(dt.getDate()+i);const label=`${wd[dt.getDay()]}, ${dmy(iso(dt))}`;let items;
+    const ds=addDays(d1,i),[yy,mm,dd]=ds.split("-").map(Number),dt=new Date(yy,mm-1,dd);const label=`${wd[dt.getDay()]}, ${dmy(ds)}`;let items;
     if(i===0&&nights===0) items=[`${go.dep} khởi hành từ ${fN} bằng ${viaL}, đến ${tN} khoảng ${go.arr}${est}`,`Làm việc tại ${tN}`,`${back.dep} khởi hành về, đến ${fN} khoảng ${back.arr}`];
     else if(i===0) items=[`${go.dep} khởi hành từ ${fN} bằng ${viaL}, đến ${tN} khoảng ${go.arr}${best.t?` (đi ~${fmtH(best.t)})`:""}`,
       intl?"Mang hộ chiếu, kiểm tra visa/điều kiện nhập cảnh, đổi tiền hoặc mang thẻ quốc tế":`Từ ${hub} về khách sạn, nhận phòng từ ${checkin}`,
@@ -219,7 +262,7 @@ async function build(){
   // 2 hero
   const bt=best.t!=null;
   $("hero").innerHTML=`<div class="od">${esc(fromT)} → ${esc(toT)}</div><div class="sub">${dmy(d1)} – ${dmy(d2)} · ${nights?nights+" đêm":"trong ngày"} · ${pax} người</div>`+
-    (bt?`<div class="big"><span class="t">${go.dep.slice(0,5)}</span><div class="line"><span>${(IC[best.k]||"")} ${fmtH(best.t)}</span></div><span class="t">${go.arr.slice(0,5)}</span></div><div class="sub">Lượt đi bằng ${esc(best.n)} · ~${money(best.p*pax,best.ccy)} · giờ đến là ước tính</div>`:"");
+    (bt?`<div class="big"><span class="t">${go.dep.slice(0,5)}</span><div class="line"><span>${(IC[best.k]||"")} ${fmtH(best.t)}</span></div><span class="t">${go.arr.slice(0,5)}</span></div><div class="sub">Lượt đi bằng ${esc(best.n)} · ~${money(best.p*pax,best.ccy)} · giờ là ước tính, xem giờ thật bên dưới</div>`:"");
   $("ai").textContent="";$("msg").textContent="";
   $("out").classList.remove("hidden");$("out").scrollIntoView({behavior:"smooth"});
 }

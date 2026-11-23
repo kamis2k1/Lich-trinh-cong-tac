@@ -11,7 +11,7 @@
 @media (prefers-color-scheme:dark){:root{--bg:#0f1318;--card:#1a1f26;--ink:#e8ecf1;--muted:#9aa5b4;--line:#2b333e;--accent:#8ab4f8;--accent-soft:#1f2a3a;--ok:#81c995;--ok-soft:#1b2e22;--warn:#fdd663}}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;font-family:"Be Vietnam Pro",system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45;font-size:15px}
+body{margin:0;font-family:"Be Vietnam Pro",system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45;font-size:16px}
 .top{background:var(--accent);color:#fff;padding:18px 16px 64px}
 @media (prefers-color-scheme:dark){.top{background:#1d3b6e}}
 .top h1{margin:0;font-size:1.25rem;font-weight:700}
@@ -23,6 +23,12 @@ label,.lbl{display:block;font-size:.75rem;color:var(--muted);font-weight:600;mar
 input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:var(--card);color:var(--ink);min-height:44px}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
 textarea{min-height:64px;resize:vertical}
+[aria-invalid=true]{border-color:#d93025!important;background:rgba(217,48,37,.06)}
+.route [aria-invalid=true]{background:transparent!important}
+.route:has([aria-invalid=true]){border-color:#d93025}
+button:disabled{opacity:.6;cursor:progress}
+button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.od{overflow-wrap:anywhere}
 button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:10px 14px;font-weight:600;min-height:40px}
 .primary{background:var(--accent);color:#fff}
 @media (prefers-color-scheme:dark){.primary{color:#0f1318}}
@@ -41,7 +47,7 @@ button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:10px 14px
 #swap{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:40px;height:40px;padding:0;border-radius:50%;background:var(--card);border:1px solid var(--line);color:var(--accent);font-size:1.15rem}
 .chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 .chips::-webkit-scrollbar{display:none}
-.chip{flex:none;padding:3px 10px;min-height:28px;font-size:.78rem;font-weight:500;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
+.chip{flex:none;padding:5px 12px;min-height:32px;font-size:.82rem;font-weight:500;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
 .g2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:12px}.g2>div{min-width:0}
 input[type=date],input[type=time]{min-width:0;max-width:100%;-webkit-appearance:none;appearance:none}
 .tm{display:flex;gap:6px}.tm select{flex:1.25;padding-left:8px;padding-right:4px}.tm input{flex:1;padding-left:8px;padding-right:4px}
@@ -51,7 +57,7 @@ summary{cursor:pointer;font-weight:600;color:var(--accent);font-size:.9rem;list-
 summary::-webkit-details-marker{display:none}
 summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
 .go{width:100%;margin-top:14px;padding:14px;font-size:1rem;border-radius:12px}
-.err{color:#d93025;font-size:.85rem;margin-top:8px;min-height:1em}
+.err{color:#d93025;font-size:.9rem;font-weight:500;overflow-wrap:anywhere}.err:not(:empty){margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(217,48,37,.08)}
 /* Kết quả */
 .hero .od{font-size:1.1rem;font-weight:700}
 .hero .sub{color:var(--muted);font-size:.85rem}
@@ -105,10 +111,10 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
   <p>Nhật Bản · Việt Nam · Nhật ⇄ Việt</p>
 </header>
 <div class="wrap">
-  <form id="f" class="card" autocomplete="off">
+  <form id="f" class="card" autocomplete="off" novalidate>
     <div class="route">
-      <div class="f"><span class="dot"></span><div><label for="from">Điểm đi</label><input id="from" list="cities" required placeholder="Ga, thành phố… (VD: Sasebo)"><div class="chips" id="fromRecent"></div></div></div>
-      <div class="f"><span class="dot"></span><div><label for="to">Điểm đến</label><input id="to" list="cities" required placeholder="VD: Imabari station, Osaka"><div class="chips" id="toRecent"></div></div></div>
+      <div class="f"><span class="dot"></span><div><label for="from">Điểm đi</label><input id="from" list="cities" required maxlength="100" enterkeyhint="next" autocapitalize="words" placeholder="Ga, thành phố… (VD: Sasebo)"><div class="chips" id="fromRecent"></div></div></div>
+      <div class="f"><span class="dot"></span><div><label for="to">Điểm đến</label><input id="to" list="cities" required maxlength="100" enterkeyhint="search" autocapitalize="words" placeholder="VD: Imabari station, Osaka"><div class="chips" id="toRecent"></div></div></div>
       <button type="button" id="swap" title="Đổi chiều đi/đến" aria-label="Đổi chiều đi và đến">⇅</button>
     </div>
     <div class="g2">
@@ -119,16 +125,16 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
       <div><label for="t1">Giờ lượt đi</label><div class="tm"><select id="m1" aria-label="Kiểu giờ lượt đi"><option value="dep">Khởi hành lúc</option><option value="arr">Đến nơi trước</option></select><input id="t1" type="time" value="08:00"></div></div>
       <div><label for="t2">Giờ lượt về</label><div class="tm"><select id="m2" aria-label="Kiểu giờ lượt về"><option value="dep">Khởi hành lúc</option><option value="arr">Về đến trước</option></select><input id="t2" type="time" value="17:00"></div></div>
     </div>
-    <details>
+    <details id="more">
       <summary>Tuỳ chọn thêm</summary>
       <div class="g2">
         <div><label for="pax">Số người</label><input id="pax" type="number" min="1" max="9" value="1" inputmode="numeric"></div>
         <div><label for="pref">Ưu tiên</label><select id="pref"><option value="fast">Nhanh nhất</option><option value="cheap">Rẻ nhất</option><option value="comfort">Thoải mái</option></select></div>
       </div>
-      <div style="margin-top:10px"><label for="note">Công việc / ghi chú</label><textarea id="note" placeholder="VD: Họp khách hàng 10h sáng ngày 2 gần ga, cần khách sạn gần ga"></textarea></div>
+      <div style="margin-top:10px"><label for="note">Công việc / ghi chú</label><textarea id="note" maxlength="300" placeholder="VD: Họp khách hàng 10h sáng ngày 2 gần ga, cần khách sạn gần ga"></textarea></div>
     </details>
+    <div id="err" class="err" role="alert" aria-live="assertive"></div>
     <button class="primary go" type="submit">Tìm lộ trình</button>
-    <div id="err" class="err" role="status"></div>
     <datalist id="cities"></datalist>
   </form>
 
@@ -148,6 +154,6 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
 
   <div class="card" id="savedCard"><h2>☆ Chuyến đã lưu</h2><ul id="saved" class="saved"><li class="muted">Chưa có chuyến nào.</li></ul></div>
 </div>
-<script src="app.js?v=12"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>
