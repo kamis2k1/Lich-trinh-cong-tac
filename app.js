@@ -534,3 +534,8 @@ Hãy gợi ý: khung giờ khởi hành nên chọn, khu vực nên ở gần n�
   try{await sample(prompt,{modelTier:"default",onText:({text})=>{$("ai").textContent=text}})}
   catch(err){$("ai").textContent=err&&err.code==="rate_limited"?"Đang quá tải, thử lại sau ít phút.":err&&err.code==="not_granted"?"Chưa được cấp quyền dùng Claude trên trang này.":"Không lấy được gợi ý: "+(err&&err.message||"lỗi")}
   btn.disabled=false};
+
+// Giao diện sáng / tối: Tự động (theo máy) → Sáng → Tối
+(()=>{const b=$("theme"),L={auto:"🌓 Tự động",light:"☀️ Sáng",dark:"🌙 Tối"};let t="auto";try{t=localStorage.getItem("theme")||"auto"}catch{}
+  const apply=()=>{if(t==="auto")delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme=t;b.textContent=L[t]||L.auto;b.title="Giao diện: "+(L[t]||L.auto).slice(3)+" (bấm để đổi)"};
+  b.onclick=()=>{t=t==="auto"?"light":t==="light"?"dark":"auto";try{t==="auto"?localStorage.removeItem("theme"):localStorage.setItem("theme",t)}catch{}apply()};apply()})();

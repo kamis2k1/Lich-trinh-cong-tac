@@ -416,6 +416,21 @@ await test("Sau khi tìm, khung nhập thu gọn; bấm Sửa để mở lại",
   await search(p, T); ok(await p.$eval("#f", f => f.classList.contains("compact")), "chưa thu gọn"); ok(!(await p.isVisible("#from")), "ô vẫn hiện");
   ok(/Tokyo → Osaka/.test(await p.textContent("#csumT")), "thiếu tóm tắt"); await p.click("#editTrip"); ok(await p.isVisible("#from"), "không mở lại");
 });
+await test("Nút giao diện: Tự động → Sáng → Tối, nhớ sau khi tải lại", async p => {
+  const bg = () => p.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  ok(/Tự động/.test(await p.textContent("#theme")), "mặc định phải là Tự động"); ok(await bg() === "rgb(242, 244, 247)", "máy sáng phải nền sáng: " + await bg());
+  await p.click("#theme"); ok(/Sáng/.test(await p.textContent("#theme")), "chưa sang Sáng");
+  await p.click("#theme"); ok(/Tối/.test(await p.textContent("#theme")) && await bg() === "rgb(15, 19, 24)", "chưa sang nền tối: " + await bg());
+  await p.reload(); ok(/Tối/.test(await p.textContent("#theme")) && await bg() === "rgb(15, 19, 24)", "tải lại mất chế độ tối");
+  await p.click("#theme"); ok(/Tự động/.test(await p.textContent("#theme")), "chưa về Tự động");
+});
+await test("Máy đang tối nhưng chọn Sáng → nền sáng, chữ đủ tương phản", async p => {
+  ok(await p.evaluate(() => getComputedStyle(document.body).backgroundColor) === "rgb(15, 19, 24)", "máy tối phải nền tối");
+  await p.click("#theme"); await p.reload();
+  ok(await p.evaluate(() => getComputedStyle(document.body).backgroundColor) === "rgb(242, 244, 247)", "chọn Sáng mà vẫn tối");
+  ok(await p.evaluate(() => getComputedStyle(document.querySelector(".primary")).color) === "rgb(255, 255, 255)", "nút chính phải chữ trắng ở chế độ sáng");
+  await p.setViewportSize({ width: 360, height: 740 }); ok(await noOverflow(p), "nút giao diện làm tràn ngang");
+}, { dark: true });
 await test("Bước 2 → chọn giờ cả 2 lượt → thanh bước chuyển sang ③", async p => {
   await search(p, { ...T, from: "Sasebo station", to: "Imabari station" }); ok(await p.$eval("#st2", e => e.className) === "on", "bước 2 chưa sáng");
   for (const [k, a, b] of [["go", "07:18", "12:34"], ["back", "17:05", "22:40"]]) { await p.fill(`.leg[data-leg="${k}"] .rdep`, a); await p.fill(`.leg[data-leg="${k}"] .rarr`, b); await p.click(`.leg[data-leg="${k}"] .rsave`); await p.waitForSelector(`.leg[data-leg="${k}"].done`); }
