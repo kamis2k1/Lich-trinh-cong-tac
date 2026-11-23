@@ -44,14 +44,28 @@ const money=(n,ccy)=>{ // n tính theo ccy gốc, hiển thị theo CUR
   return CUR==="JPY"?"¥"+(Math.round(v/100)*100).toLocaleString("ja-JP"):(Math.round(v/10000)*10000).toLocaleString("vi-VN")+"đ"};
 const dmy=s=>s.split("-").reverse().join("/");
 const wd=["Chủ nhật","Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"];
+const jaName=(c,txt)=>{ // tên tiếng Nhật cho trang tra tàu Nhật
+  if(!c)return txt;let n=c.geo?c.ja:(c[0].match(/[\u3040-\u30ff\u4e00-\u9fff]+$/)||[""])[0];
+  if(!n||/[a-z]/i.test(n))return txt;if(/station|駅|\bga\b/i.test(txt)&&!/駅$/.test(n))n+="駅";return n};
+const toMin=t=>{const [h,m]=(t||"08:00").split(":").map(Number);return h*60+m};
+const hhmm=m=>{const d=Math.floor(m/1440),r=((m%1440)+1440)%1440;return String(Math.floor(r/60)).padStart(2,"0")+":"+String(r%60).padStart(2,"0")+(d>0?" (hôm sau)":d<0?" (hôm trước)":"")};
+function legTimes(mode,t,hours){const m=toMin(t),L=Math.round((hours||0)*12)*5;return mode==="arr"?{dep:hhmm(m-L),arr:hhmm(m)}:{dep:hhmm(m),arr:hhmm(m+L)}}
+function routeLinks(from,to,fromJa,toJa,date,mode,t){
+  const e=encodeURIComponent,[y,mo,d]=date.split("-"),[h,mi]=(t||"08:00").split(":");
+  const H=+h,ap=H>=12?"pm":"am",h12=(H%12)||12;
+  return [
+    ["Google Maps",`https://www.google.com/maps/dir/?saddr=${e(from)}&daddr=${e(to)}&dirflg=r&ttype=${mode}&date=${mo}%2F${d}%2F${y.slice(2)}&time=${h12}%3A${mi}${ap}`],
+    ["Yahoo!乗換案内",`https://transit.yahoo.co.jp/search/result?from=${e(fromJa)}&to=${e(toJa)}&y=${y}&m=${mo}&d=${d}&hh=${h}&m1=${mi[0]}&m2=${mi[1]}&type=${mode==="arr"?4:1}&ticket=ic&expkind=1&ws=3&s=0`],
+    ["ジョルダン",`https://www.jorudan.co.jp/norikae/cgi/nori.cgi?eki1=${e(fromJa)}&eki2=${e(toJa)}&Dym=${y}${mo}&Ddd=${+d}&Dhh=${+h}&Dmn1=${mi[0]}&Dmn2=${mi[1]}&Cway=${mode==="arr"?1:0}&S=${e("検索")}`]
+  ]}
 const short=c=>c?(c.geo?c[0]:c[0].split(" ")[0]):"";
 // Tra địa điểm bất kỳ qua OpenStreetMap, gán sân bay/tàu theo thành phố lớn gần nhất
 async function geocode(q){
   try{
-    const r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&accept-language=vi&q="+encodeURIComponent(q));
+    const r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&namedetails=1&accept-language=vi&q="+encodeURIComponent(q));
     const j=await r.json();if(!j.length)return null;
     const g=j[0],cc=((g.address&&g.address.country_code)||"").toUpperCase();
-    const c=[q,"",+g.lat,+g.lon,0,cc];c.geo=true;c.acc=0;
+    const c=[q,"",+g.lat,+g.lon,0,cc];c.geo=true;c.acc=0;c.ja=(g.namedetails&&(g.namedetails["name:ja"]||g.namedetails.name))||"";
     const near=C.filter(x=>x[5]===cc).map(x=>[x,km(c,x)]).sort((a,b)=>a[1]-b[1]);
     const ap=near.find(([x])=>x[1]);
     if(ap&&ap[1]<120){c[1]=ap[0][1];c.acc=ap[1]*1.3/45;c.apName=short(ap[0]);c.apKm=ap[1]}
@@ -125,6 +139,7 @@ function bookingLinks(A,B,fromT,toT,d1,d2,pax,opts){
 
 async function build(){
   $("err").textContent="";
+  const m1=$("m1").value,t1=$("t1").value||"08:00",m2=$("m2").value,t2=$("t2").value||"17:00";
   const fromT=$("from").value.trim(),toT=$("to").value.trim(),d1=$("d1").value,d2=$("d2").value,pax=+$("pax").value||1,pref=$("pref").value,note=$("note").value.trim();
   if(!fromT||!toT||!d1||!d2){$("err").textContent="Vui lòng nhập đủ 4 thông tin.";return}
   if(d2<d1){$("err").textContent="Ngày về phải sau hoặc trùng ngày đi.";return}
@@ -136,7 +151,7 @@ async function build(){
   const nights=Math.round((new Date(d2)-new Date(d1))/864e5);
   CUR=(A&&A[5]==="JP")||(!A&&B&&B[5]==="JP")?"JPY":"VND";
   const jpDest=B&&B[5]==="JP",intl=A&&B&&A[5]!==B[5];
-  cur={fromT,toT,A,B,d1,d2,pax,pref,note,nights,jpDest,intl};
+  cur={fromT,toT,A,B,d1,d2,pax,pref,note,nights,jpDest,intl,m1,t1,m2,t2};
 
   let opts,dist=null;
   if(A&&B){({opts,dist}=transportOptions(A,B))}
@@ -147,21 +162,29 @@ async function build(){
   $("opts").innerHTML=(dist?`<p class="muted">Khoảng cách đường chim bay ~${Math.round(dist)} km.${intl?` Giá quy đổi theo tỉ giá ước tính 1¥ ≈ ${JPY2VND}đ.`:""}</p>`:"")+opts.map((o,i)=>`<div class="opt"><div><b>${o.n}${i===0?'<span class="tag best">Phù hợp nhất</span>':''}</b><span class="muted">${o.d}</span></div><div style="text-align:right">${o.t!=null?`<b>${fmtH(o.t)}</b><span class="muted">~${money(o.p*pax,o.ccy)} / chiều${pax>1?` (${pax} người)`:''}</span>`:''}</div></div>`).join("");
 
   const L=bookingLinks(A,B,fromT,toT,d1,d2,pax,opts);
-  $("links").innerHTML=L.map(l=>`<a href="${l[1]}" target="_blank" rel="noopener">${l[0]} ↗</a>`).join("");
+  let legHtml="";
+  if(A&&B&&A[5]==="JP"&&B[5]==="JP"){
+    const fj=jaName(A,fromT),tj=jaName(B,toT);
+    const leg=(lbl,f,t,fJ,tJ,date,mode,tm)=>`<div class="leg"><b>${lbl}: ${mode==="arr"?"đến trước":"khởi hành"} ${tm}, ${dmy(date)}</b>${routeLinks(f,t,fJ,tJ,date,mode,tm).map(l=>`<a href="${l[1]}" target="_blank" rel="noopener">${l[0]} ↗</a>`).join("")}</div>`;
+    legHtml=`<p class="muted" style="margin:0 0 6px">Giờ tàu thật theo giờ bạn chọn:</p>`+leg("Lượt đi",fromT,toT,fj,tj,d1,m1,t1)+leg("Lượt về",toT,fromT,tj,fj,d2,m2,t2)+`<p class="muted" style="margin:4px 0 6px">Đặt vé và phòng:</p>`;
+  }
+  $("links").innerHTML=legHtml+L.map(l=>`<a href="${l[1]}" target="_blank" rel="noopener">${l[0]} ↗</a>`).join("");
 
   const best=opts[0],fN=A?short(A):fromT,tN=B?short(B):toT,days=[];
   const via=best.n.replace(/\s*\(.*\)/,"");const viaL=/^[A-Z]{2}|Shinkansen/.test(via.split(" ")[0])?via:via.charAt(0).toLowerCase()+via.slice(1);
   const hub=best.k==="fly"?"sân bay":best.k==="train"?"ga":"bến xe";
   const checkin=jpDest?"15h":"14h",checkout=jpDest?"10h–11h":"12h";
   const local=jpDest?"Đi lại trong thành phố bằng tàu điện, dùng thẻ IC (Suica/ICOCA) hoặc Mobile Suica":"Đặt xe công nghệ (Grab, Xanh SM) trước giờ hẹn 30 phút để tránh kẹt xe";
+  const go=legTimes(m1,t1,best.t),back=legTimes(m2,t2,best.t),est=best.t?" (giờ đến là ước tính)":"";
+  cur.go=go;cur.back=back;
   for(let i=0;i<=nights;i++){
     const dt=new Date(d1);dt.setDate(dt.getDate()+i);const label=`${wd[dt.getDay()]}, ${dmy(iso(dt))}`;let items;
-    if(i===0&&nights===0) items=[`Sáng sớm khởi hành từ ${fN} bằng ${viaL}`,`Làm việc tại ${tN}`,`Chiều tối quay về ${fN}`];
-    else if(i===0) items=[`Khởi hành từ ${fN} bằng ${viaL}${best.t?` (khoảng ${fmtH(best.t)})`:""}`,
+    if(i===0&&nights===0) items=[`${go.dep} khởi hành từ ${fN} bằng ${viaL}, đến ${tN} khoảng ${go.arr}${est}`,`Làm việc tại ${tN}`,`${back.dep} khởi hành về, đến ${fN} khoảng ${back.arr}`];
+    else if(i===0) items=[`${go.dep} khởi hành từ ${fN} bằng ${viaL}, đến ${tN} khoảng ${go.arr}${best.t?` (đi ~${fmtH(best.t)})`:""}`,
       intl?"Mang hộ chiếu, kiểm tra visa/điều kiện nhập cảnh, đổi tiền hoặc mang thẻ quốc tế":`Từ ${hub} về khách sạn, nhận phòng từ ${checkin}`,
       intl?`Từ sân bay về khách sạn, nhận phòng từ ${checkin}`:"Chuẩn bị tài liệu, xác nhận lịch hẹn ngày mai"];
     else if(i===nights) items=[`Trả phòng trước ${checkout}${jpDest?", gửi hành lý ở tủ khoá (coin locker) tại ga":", gửi hành lý tại lễ tân"}`,
-      `Kết thúc công việc, ra ${best.k==="fly"?`sân bay trước giờ bay ${intl?3:2} tiếng`:hub+" trước 20–30 phút"}`,`Về đến ${fN}`];
+      `Kết thúc công việc, ra ${best.k==="fly"?`sân bay trước giờ bay ${intl?3:2} tiếng`:hub+" trước 20–30 phút"}`,`${back.dep} khởi hành về, đến ${fN} khoảng ${back.arr}`];
     else items=[`Ngày làm việc ${i} tại ${tN}`,local,jpDest?"Tối: tổng hợp biên bản, gửi báo cáo; nhớ danh thiếp (meishi) cho buổi hẹn":"Tối: tổng hợp biên bản, gửi báo cáo nhanh"];
     days.push({label,items});
   }
@@ -172,13 +195,13 @@ async function build(){
   $("out").classList.remove("hidden");$("out").scrollIntoView({behavior:"smooth"});
 }
 function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
-function asText(){if(!cur)return"";return `Lịch trình công tác ${cur.fromT} → ${cur.toT} (${dmy(cur.d1)} - ${dmy(cur.d2)})\nPhương tiện: ${cur.opts[0].n}\n\n`+cur.days.map((d,i)=>`Ngày ${i+1} (${d.label})\n`+d.items.map(x=>"- "+x).join("\n")).join("\n\n")+($("ai").textContent?"\n\nGợi ý chi tiết:\n"+$("ai").textContent:"")}
+function asText(){if(!cur)return"";return `Lịch trình công tác ${cur.fromT} → ${cur.toT} (${dmy(cur.d1)} - ${dmy(cur.d2)})\nPhương tiện: ${cur.opts[0].n}\nLượt đi: ${cur.go.dep} → ${cur.go.arr}\nLượt về: ${cur.back.dep} → ${cur.back.arr}\n\n`+cur.days.map((d,i)=>`Ngày ${i+1} (${d.label})\n`+d.items.map(x=>"- "+x).join("\n")).join("\n\n")+($("ai").textContent?"\n\nGợi ý chi tiết:\n"+$("ai").textContent:"")}
 $("copy").onclick=async()=>{try{await navigator.clipboard.writeText(asText());$("msg").textContent="Đã sao chép."}catch{$("msg").textContent="Trình duyệt chặn sao chép, hãy bôi đen để copy."}};
 
 function loadSaved(){try{return JSON.parse(localStorage.getItem("trips")||"[]")}catch{return[]}}
 function renderSaved(){const s=loadSaved();$("saved").innerHTML=s.length?s.map((t,i)=>`<li>${esc(t.fromT)} → ${esc(t.toT)}, ${dmy(t.d1)} - ${dmy(t.d2)} <button class="ghost" data-i="${i}">Mở</button> <button class="ghost" data-del="${i}">Xoá</button></li>`).join(""):'<li class="muted">Chưa có chuyến nào.</li>'}
-$("save").onclick=()=>{const s=loadSaved();s.unshift({fromT:cur.fromT,toT:cur.toT,d1:cur.d1,d2:cur.d2,pax:cur.pax,pref:cur.pref,note:cur.note});try{localStorage.setItem("trips",JSON.stringify(s.slice(0,20)));$("msg").textContent="Đã lưu.";}catch{$("msg").textContent="Không lưu được trên trình duyệt này."}renderSaved()};
-$("saved").onclick=e=>{const s=loadSaved();if(e.target.dataset.i){const t=s[e.target.dataset.i];$("from").value=t.fromT;$("to").value=t.toT;$("d1").value=t.d1;$("d2").value=t.d2;$("pax").value=t.pax;$("pref").value=t.pref;$("note").value=t.note||"";build()}
+$("save").onclick=()=>{const s=loadSaved();s.unshift({fromT:cur.fromT,toT:cur.toT,d1:cur.d1,d2:cur.d2,m1:cur.m1,t1:cur.t1,m2:cur.m2,t2:cur.t2,pax:cur.pax,pref:cur.pref,note:cur.note});try{localStorage.setItem("trips",JSON.stringify(s.slice(0,20)));$("msg").textContent="Đã lưu.";}catch{$("msg").textContent="Không lưu được trên trình duyệt này."}renderSaved()};
+$("saved").onclick=e=>{const s=loadSaved();if(e.target.dataset.i){const t=s[e.target.dataset.i];$("from").value=t.fromT;$("to").value=t.toT;$("d1").value=t.d1;$("d2").value=t.d2;if(t.t1){$("m1").value=t.m1;$("t1").value=t.t1;$("m2").value=t.m2;$("t2").value=t.t2}$("pax").value=t.pax;$("pref").value=t.pref;$("note").value=t.note||"";build()}
   if(e.target.dataset.del){s.splice(+e.target.dataset.del,1);try{localStorage.setItem("trips",JSON.stringify(s))}catch{}renderSaved()}};
 renderSaved();
 

@@ -37,6 +37,8 @@ h2{font-size:1.15rem;margin:0 0 12px}
 .day ul{margin:4px 0 0;padding-left:18px}
 .err{color:#c0392b;margin-top:8px}
 .hidden{display:none}
+.tm{display:flex;gap:6px}.tm select{flex:1.3}.tm input{flex:1}
+.leg{margin:2px 0 10px}.leg b{display:block;font-size:.9rem;margin-bottom:2px}
 .ai{white-space:pre-wrap}
 .saved li{margin:4px 0}
 .saved button{padding:4px 10px;font-size:.8rem}
@@ -53,6 +55,8 @@ h2{font-size:1.15rem;margin:0 0 12px}
       <div><label for="to">Điểm đến</label><input id="to" list="cities" required placeholder="VD: Osaka, Đà Nẵng"></div>
       <div><label for="d1">Ngày đi</label><input id="d1" type="date" required></div>
       <div><label for="d2">Ngày về</label><input id="d2" type="date" required></div>
+      <div><label for="t1">Giờ lượt đi</label><div class="tm"><select id="m1" aria-label="Kiểu giờ lượt đi"><option value="dep">Khởi hành lúc</option><option value="arr">Đến nơi trước</option></select><input id="t1" type="time" value="08:00"></div></div>
+      <div><label for="t2">Giờ lượt về</label><div class="tm"><select id="m2" aria-label="Kiểu giờ lượt về"><option value="dep">Khởi hành lúc</option><option value="arr">Về đến trước</option></select><input id="t2" type="time" value="17:00"></div></div>
       <div><label for="pax">Số người</label><input id="pax" type="number" min="1" max="9" value="1"></div>
       <div><label for="pref">Ưu tiên</label>
         <select id="pref"><option value="fast">Nhanh nhất</option><option value="cheap">Tiết kiệm</option><option value="comfort">Thoải mái</option></select></div>
@@ -78,6 +82,6 @@ h2{font-size:1.15rem;margin:0 0 12px}
   <div class="card" id="savedCard"><h2>Chuyến đã lưu</h2><ul id="saved" class="saved"><li class="muted">Chưa có chuyến nào.</li></ul></div>
 </div>
 
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
