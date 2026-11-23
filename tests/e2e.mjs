@@ -39,6 +39,7 @@ async function newPage(opt = {}) {
 }
 
 async function search(page, v) {
+  await page.evaluate(() => document.getElementById("f").classList.remove("compact"));
   const set = async (sel, val) => { if (val !== undefined) await page.fill(sel, String(val)); };
   await set("#from", v.from); await set("#to", v.to);
   if (v.d1 !== undefined) await page.$eval("#d1", (e, x) => { e.value = x; e.dispatchEvent(new Event("change")); }, v.d1);
@@ -166,7 +167,7 @@ await test("Đến trước 03:00 với chặng dài → ghi rõ khởi hành h�
 // 7. Thao tác
 await test("Bấm Tìm liên tục 3 lần → chỉ tra bản đồ 1 lần mỗi địa điểm", async p => {
   await p.fill("#from", "Hakone"); await p.fill("#to", "Tokyo");
-  await Promise.all([p.click("button[type=submit]"), p.click("button[type=submit]", { force: true }), p.click("button[type=submit]", { force: true })]);
+  await p.evaluate(() => { const f = document.getElementById("f"); for (let i = 0; i < 3; i++) f.requestSubmit(); });
   await p.waitForSelector("#out:not(.hidden)"); ok(p.geoCalls === 1, "gọi " + p.geoCalls + " lần");
 });
 await test("Nhấn Enter ở ô điểm đến → tìm luôn", async p => { await p.fill("#from", "Tokyo"); await p.fill("#to", "Osaka"); await p.press("#to", "Enter"); await p.waitForSelector("#out:not(.hidden)", { timeout: 3000 }); });
@@ -267,13 +268,13 @@ async function navPage(status = 200) {
   return p;
 }
 const KEY = "abcdEFGH1234abcdEFGH1234abcdEFGH1234abcdEFGH12";
-async function connect(p) { await p.click("#navSetup summary"); await p.fill("#navKey", KEY); await p.click("#navSave"); }
+async function connect(p) { await p.$eval("#adv", e => e.open = true); await p.click("#navSetup summary"); await p.fill("#navKey", KEY); await p.click("#navSave"); }
 async function navTest(name, status, fn) {
   let p; try { p = await navPage(status); await fn(p); if (p.errors.length) throw new Error("Lỗi JS: " + p.errors.join(" | ")); results.push([true, name]); }
   catch (e) { results.push([false, name, e.message.split("\n")[0]]); } finally { if (p) await p.context().close(); }
 }
 await test("Mã RapidAPI sai định dạng → báo lỗi, không lưu", async p => {
-  await p.click("#navSetup summary"); await p.fill("#navKey", "abc 123"); await p.click("#navSave");
+  await p.$eval("#adv", e => e.open = true); await p.click("#navSetup summary"); await p.fill("#navKey", "abc 123"); await p.click("#navSave");
   ok(/định dạng/.test(await p.textContent("#navErr")), "không báo lỗi"); ok(/Chưa kết nối/.test(await p.textContent("#navState")), "vẫn lưu");
 });
 await navTest("Kết nối NAVITIME → tìm chuyến → hiện tuyến, giờ, giá, gửi đúng tham số", 200, async p => {
@@ -305,7 +306,7 @@ await navTest("Hết lượt tra (429) → báo hết lượt", 429, async p => 
 });
 await navTest("Xoá mã → nút NAVITIME biến mất", 200, async p => {
   await connect(p); await search(p, T); ok(await p.$(".navbtn"), "chưa có nút");
-  await p.click("#navSetup summary"); await p.click("#navDel"); await p.waitForFunction(() => !document.querySelector(".navbtn")); ok(/Chưa kết nối/.test(await p.textContent("#navState")), "chưa xoá");
+  await p.$eval("#adv", e => e.open = true); await p.click("#navSetup summary"); await p.click("#navDel"); await p.waitForFunction(() => !document.querySelector(".navbtn")); ok(/Chưa kết nối/.test(await p.textContent("#navState")), "chưa xoá");
 });
 
 // 11. Nhận chuyến từ nút bookmark trên Yahoo
@@ -341,11 +342,22 @@ await test("Dữ liệu gửi về bị hỏng / chèn mã → báo lỗi, khôn
   await p.goto(BASE + "#yahoo=" + encodeURIComponent(JSON.stringify({ d: T.d1, f: '<img src=x onerror="window.__w=1">', t: "x", r: ["08:00発→09:00着 1,000円 ＪＲ<img/src=x/onerror=window.__w=1>"] })));
   await p.waitForSelector(".ypick"); ok(!(await p.evaluate(() => window.__w)), "mã đã chạy!");
 });
-await test("Bấm nhầm nút bookmark ngay trên web → hướng dẫn, không chạy", async p => { await p.click("#bmLink"); ok(/kéo nút/.test(await p.textContent("#bmMsg")), "không hướng dẫn"); });
+await test("Bấm nhầm nút bookmark ngay trên web → hướng dẫn, không chạy", async p => { await p.$eval("#adv", e => e.open = true); await p.click("#bmLink"); ok(/kéo nút/.test(await p.textContent("#bmMsg")), "không hướng dẫn"); });
 await test("Nút bookmark là mã javascript hợp lệ, đúng địa chỉ web", async p => {
   const href = await p.$eval("#bmLink", a => a.getAttribute("href"));
   ok(href.startsWith("javascript:(()=>{") && !href.includes("#yahoo"), href.slice(0, 60));
   new Function(href.slice(11)); ok(href.includes("127.0.0.1:8080/\\x23yahoo="), "sai địa chỉ");
+});
+
+await test("Sau khi tìm, khung nhập thu gọn; bấm Sửa để mở lại", async p => {
+  await search(p, T); ok(await p.$eval("#f", f => f.classList.contains("compact")), "chưa thu gọn"); ok(!(await p.isVisible("#from")), "ô vẫn hiện");
+  ok(/Tokyo → Osaka/.test(await p.textContent("#csumT")), "thiếu tóm tắt"); await p.click("#editTrip"); ok(await p.isVisible("#from"), "không mở lại");
+});
+await test("Bước 2 → chọn giờ cả 2 lượt → thanh bước chuyển sang ③", async p => {
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station" }); ok(await p.$eval("#st2", e => e.className) === "on", "bước 2 chưa sáng");
+  for (const [k, a, b] of [["go", "07:18", "12:34"], ["back", "17:05", "22:40"]]) { await p.fill(`.leg[data-leg="${k}"] .rdep`, a); await p.fill(`.leg[data-leg="${k}"] .rarr`, b); await p.click(`.leg[data-leg="${k}"] .rsave`); await p.waitForSelector(`.leg[data-leg="${k}"].done`); }
+  ok(await p.$eval("#st2", e => e.className) === "done" && await p.$eval("#st3", e => e.className) === "on", "thanh bước chưa cập nhật");
+  ok(/cả lượt đi và lượt về/.test(await p.textContent("#hero")), "thiếu trạng thái");
 });
 
 await browser.close();

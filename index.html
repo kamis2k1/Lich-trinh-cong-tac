@@ -121,15 +121,45 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
 .fix{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
 .lab{display:block;margin-top:8px;text-transform:none;letter-spacing:0;font-size:.8rem}
 .lab input,.lab textarea{margin-top:4px;font-size:1rem}
+.stepper{display:flex;gap:6px;margin:0 0 10px;position:relative;z-index:1}
+.stepper span{flex:1;text-align:center;font-size:.78rem;font-weight:600;padding:8px 4px;border-radius:99px;background:rgba(255,255,255,.18);color:#fff;opacity:.75;white-space:nowrap}
+.stepper span.on{background:#fff;color:var(--accent);opacity:1}
+.stepper span.done{background:var(--ok);color:#fff;opacity:1}
+@media (prefers-color-scheme:dark){.stepper span.on{background:var(--card)}}
+.sh{font-size:1.1rem}
+.num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:.9rem;flex:none}
+@media (prefers-color-scheme:dark){.num{color:#0f1318}}
+.guide{background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin:0 0 4px;font-size:.92rem}
+.pick{margin-top:10px}
+.lbl2{font-weight:600;font-size:.9rem;margin-bottom:2px}
+.g3{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:end}
+.g3 .lab{margin-top:4px}
+.g3 .rsave{min-height:44px;padding:0 18px}
+.rclear{margin-top:8px}
+.leg .h small{font-weight:500;color:var(--muted)}
+.hstat{margin-top:10px;padding:8px 12px;border-radius:10px;font-weight:600;font-size:.9rem;background:#fff4e5;color:#8a4b00}
+.hstat.ok{background:var(--ok-soft);color:var(--ok)}
+@media (prefers-color-scheme:dark){.hstat{background:#3a2a10;color:#fdd663}}
+#optWrap>summary{font-size:1.05rem;font-weight:700;color:var(--ink)}
+#optWrap>summary:before{content:""}
+.adv>summary{font-weight:600}
+#f.compact>*:not(.sh):not(.csum):not(datalist){display:none}
+.csum{display:none;align-items:center;gap:10px;justify-content:space-between}
+#f.compact .csum{display:flex}
+.csum b{overflow-wrap:anywhere}
+.sub-card{border-top:1px solid var(--line);margin-top:14px;padding-top:12px}
 </style>
 </head>
 <body>
 <header class="top">
   <h1>🧳 Lịch trình công tác</h1>
-  <p>Nhật Bản · Việt Nam · Nhật ⇄ Việt</p>
+  <p>Nhập chuyến → chọn giờ tàu → nhận lịch trình</p>
 </header>
 <div class="wrap">
+  <nav class="stepper" aria-label="Các bước"><span id="st1" class="on">① Nhập chuyến</span><span id="st2">② Chọn giờ tàu</span><span id="st3">③ Lịch trình</span></nav>
   <form id="f" class="card" autocomplete="off" novalidate>
+    <h2 class="sh"><span class="num">1</span> Nhập chuyến đi</h2>
+    <div class="csum"><div><b id="csumT"></b><div class="muted" id="csumD"></div></div><button type="button" class="ghost" id="editTrip">✎ Sửa</button></div>
     <div class="route">
       <div class="f"><span class="dot"></span><div><label for="from">Điểm đi</label><input id="from" list="cities" required maxlength="100" enterkeyhint="next" autocapitalize="words" placeholder="Ga, thành phố… (VD: Sasebo)"><div class="chips" id="fromRecent"></div></div></div>
       <div class="f"><span class="dot"></span><div><label for="to">Điểm đến</label><input id="to" list="cities" required maxlength="100" enterkeyhint="search" autocapitalize="words" placeholder="VD: Imabari station, Osaka"><div class="chips" id="toRecent"></div></div></div>
@@ -152,25 +182,29 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
       <div style="margin-top:10px"><label for="note">Công việc / ghi chú</label><textarea id="note" maxlength="300" placeholder="VD: Họp khách hàng 10h sáng ngày 2 gần ga, cần khách sạn gần ga"></textarea></div>
     </details>
     <div id="err" class="err" role="alert" aria-live="assertive"></div>
-    <button class="primary go" type="submit">Tìm lộ trình</button>
+    <button class="primary go" type="submit">Tiếp tục ➜</button>
     <datalist id="cities"></datalist>
   </form>
 
   <div id="out" class="hidden">
     <div class="card hero" id="hero"></div>
-    <div class="card" id="legCard"><h2>🕒 Giờ tàu thật</h2><div id="legs"></div></div>
-    <div class="card"><h2>🚆 Phương tiện</h2><div id="opts"></div>
-      <p class="note">Thời gian và giá là ước tính theo khoảng cách. Giờ và giá chính xác xem ở mục Giờ tàu thật hoặc trang đặt vé.</p></div>
+    <div class="card" id="legCard"><h2 class="sh"><span class="num">2</span> Chọn giờ tàu</h2>
+      <p class="guide">Với mỗi lượt: bấm <b>Mở Yahoo</b> xem các chuyến → chọn chuyến bạn thích → gõ <b>giờ đi</b>, <b>giờ đến</b> vào đây → bấm <b>Lưu</b>.</p>
+      <div id="legs"></div></div>
+    <div class="card" id="optCard"><details id="optWrap" open><summary id="optSum">🚆 Phương tiện gợi ý</summary><div id="opts"></div>
+      <p class="note">Thời gian và giá ở đây là ước tính theo khoảng cách.</p></details></div>
+    <div class="card"><h2 class="sh"><span class="num">3</span> Lịch trình của bạn</h2><div id="plan"></div>
+      <div class="actions"><button class="primary" type="button" id="save">☆ Lưu chuyến</button><button class="ghost" type="button" id="copy">Sao chép</button><span id="msg" class="muted"></span></div></div>
     <div class="card"><h2>🎫 Đặt vé &amp; khách sạn</h2><div id="links"></div></div>
-    <div class="card"><h2>📋 Lịch trình</h2><div id="plan"></div>
-      <div class="actions"><button class="ghost" type="button" id="copy">Sao chép</button><button class="ghost" type="button" id="save">☆ Lưu chuyến</button><span id="msg" class="muted"></span></div></div>
     <div class="card" id="aiCard"><h2>✨ Gợi ý từ Claude</h2>
       <p class="muted">Lịch trình chi tiết hơn: giờ nên đi, khu vực ở, mẹo di chuyển, thời tiết.</p>
       <div class="actions"><button class="primary" type="button" id="aiBtn">Nhờ Claude gợi ý</button></div>
       <div id="ai" class="ai" style="margin-top:12px"></div></div>
   </div>
 
-  <div class="card" id="bmCard"><h2>📥 Lấy giờ từ Yahoo bằng 1 chạm</h2>
+  <div class="card" id="savedCard"><h2>☆ Chuyến đã lưu</h2><ul id="saved" class="saved"><li class="muted">Chưa có chuyến nào.</li></ul></div>
+  <details class="card adv" id="adv"><summary>⚙ Nâng cao: lấy giờ tàu tự động (không bắt buộc)</summary>
+  <div class="sub-card" id="bmCard"><h2>📥 Lấy giờ từ Yahoo bằng 1 chạm</h2>
     <p class="muted">Cài nút này một lần. Sau đó trên trang kết quả Yahoo!乗換案内, bấm nút là các chuyến tự gửi về đây để bạn chọn.</p>
     <div class="actions"><a id="bmLink" class="bm" href="#" title="Kéo nút này lên thanh dấu trang">📥 Gửi về Lịch trình</a><button type="button" class="ghost" id="bmCopy">Copy mã nút</button><span id="bmMsg" class="muted"></span></div>
     <details><summary>Cách cài</summary>
@@ -179,7 +213,7 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
       <p class="muted">Cách dùng: lập lịch trình ở đây → bấm Yahoo!乗換案内 → bấm nút → chọn chuyến.</p>
     </details>
   </div>
-  <div class="card" id="navCard"><h2>⚙ Kết nối NAVITIME</h2>
+  <div class="sub-card" id="navCard"><h2>⚙ Kết nối NAVITIME</h2>
     <p class="muted" id="navState">Chưa kết nối. Khi kết nối, web tự tìm các chuyến tàu (tuyến, chỗ đổi tàu, giá vé) ngay trong trang.</p>
     <details id="navSetup"><summary>Cách kết nối (miễn phí, 500 lượt tra/tháng)</summary>
       <ol class="muted steps"><li>Mở <a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-totalnavi/pricing" target="_blank" rel="noopener">trang NAVITIME trên RapidAPI</a>, đăng ký tài khoản, chọn gói <b>Basic ($0)</b>.</li>
@@ -189,8 +223,8 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
       <div class="actions"><button type="button" class="primary" id="navSave">Lưu mã</button><button type="button" class="ghost" id="navDel">Xoá mã</button></div>
     </details>
   </div>
-  <div class="card" id="savedCard"><h2>☆ Chuyến đã lưu</h2><ul id="saved" class="saved"><li class="muted">Chưa có chuyến nào.</li></ul></div>
+  </details>
 </div>
-<script src="app.js?v=20"></script>
+<script src="app.js?v=22"></script>
 </body>
 </html>

@@ -109,10 +109,11 @@ function setErr(msg,ids=[]){
   $("err").textContent=msg;
   for(const id of FIELDS)$(id).removeAttribute("aria-invalid");
   for(const id of ids)$(id).setAttribute("aria-invalid","true");
-  if(msg){$("out").classList.add("hidden");if(ids[0]&&$(ids[0]).focus)$(ids[0]).focus({preventScroll:true});$("err").scrollIntoView&&$("err").scrollIntoView({block:"center",behavior:"smooth"})}
+  if(msg){$("out").classList.add("hidden");$("st1").className="on";$("st2").className=$("st3").className="";if(ids[0]&&$(ids[0]).focus)$(ids[0]).focus({preventScroll:true});$("err").scrollIntoView&&$("err").scrollIntoView({block:"center",behavior:"smooth"})}
 }
 const clean=s=>s.replace(/[\u0000-\u001f\u007f]/g,"").replace(/\s+/g," ").trim().slice(0,100);
 let busy=false;
+document.addEventListener("click",e=>{if(e.target.id==="editTrip"){$("f").classList.remove("compact");$("from").focus()}});
 // ===== NAVITIME (RapidAPI, gói Basic miễn phí) =====
 const navKey=()=>{try{return localStorage.getItem("navKey")||""}catch{return MEM.navKey||""}};
 function setNavKey(v){try{v?localStorage.setItem("navKey",v):localStorage.removeItem("navKey")}catch{v?MEM.navKey=v:delete MEM.navKey}renderNav()}
@@ -298,20 +299,24 @@ async function build(){
   let legHtml="";const best0=opts[0];
   if(A&&B&&A[5]==="JP"&&B[5]==="JP"){
     const fj=jaName(A,fromT),tj=jaName(B,toT);
-    const leg=(key,lbl,f,t,fJ,tJ,date,mode,tm)=>{const r=real[key];return `<div class="leg${r?" done":""}" data-leg="${key}"><div class="h">${lbl} · ${dmy(date)} · ${mode==="arr"?"đến trước":"khởi hành"} ${tm}</div>`+
-      (r?`<div class="realbox">${r.src==="navitime"?"≈ Giờ NAVITIME (trung bình)":"✓ Giờ thật"}: <b>${esc(r.dep)} → ${esc(r.arr)}</b>${r.line?` · ${esc(r.line)}`:""}${r.fare?` · ¥${Number(r.fare).toLocaleString("ja-JP")}`:""}</div>`:"")+
-      `<div class="btns">${routeLinks(f,t,fJ,tJ,date,mode,tm,best0.t).map((l,k)=>`<a class="${k===0?"pri":""}" href="${l[1]}" target="_blank" rel="noopener">${l[0].replace("★ ","").replace(" (giờ tàu chính xác)","")}</a>`).join("")}</div>`+
-      (navKey()?`<button type="button" class="ghost navbtn" data-q="${esc(JSON.stringify({s:[f===fromT?A[2]:B[2],f===fromT?A[3]:B[3]],g:[f===fromT?B[2]:A[2],f===fromT?B[3]:A[3]],date,mode,tm}))}">🔎 Tìm chuyến NAVITIME</button><div class="nres"></div>`:"")+
-      `<details class="fix"><summary>${r?"Sửa giờ thật":"✎ Chốt giờ thật từ Yahoo"}</summary>
-        <label class="lab">Dán kết quả từ Yahoo (tự nhận giờ và giá)<textarea class="rpaste" rows="2" placeholder="VD: 08:06発→13:34着 5時間28分 18,070円"></textarea></label>
-        <div class="g2"><label class="lab">Giờ đi<input type="time" class="rdep" value="${r?esc(r.dep):""}"></label><label class="lab">Giờ đến<input type="time" class="rarr" value="${r?esc(r.arr):""}"></label></div>
-        <div class="g2"><label class="lab">Giá vé (¥)<input type="text" inputmode="numeric" class="rfare" maxlength="7" value="${r&&r.fare?esc(String(r.fare)):""}"></label><label class="lab">Tuyến (tuỳ chọn)<input type="text" class="rline" maxlength="80" placeholder="みどり→のぞみ→バス" value="${r&&r.line?esc(r.line):""}"></label></div>
+    const leg=(key,lbl,f,t,fJ,tJ,date,mode,tm)=>{const r=real[key];const [yy,mm,dd]=date.split("-").map(Number);return `<div class="leg${r?" done":""}" data-leg="${key}"><div class="h">${lbl} · ${wd[new Date(yy,mm-1,dd).getDay()]}, ${dmy(date)} <small>(${mode==="arr"?"đến trước":"đi lúc"} ${tm})</small></div>`+
+      (r?`<div class="realbox">${r.src==="navitime"?"≈ Giờ NAVITIME (trung bình)":"✓ Đã chọn"}: <b>${esc(r.dep)} → ${esc(r.arr)}</b>${r.line?` · ${esc(r.line)}`:""}${r.fare?` · ¥${Number(r.fare).toLocaleString("ja-JP")}`:""}</div>`:"")+
+      `<div class="btns">${routeLinks(f,t,fJ,tJ,date,mode,tm,best0.t).map((l,k)=>`<a class="${k===0?"pri":""}" href="${l[1]}" target="_blank" rel="noopener">${k===0?"Mở Yahoo xem chuyến ↗":l[0]}</a>`).join("")}</div>`+
+      `<div class="pick"><div class="lbl2">${r?"Đổi chuyến khác? Gõ lại giờ:":"Gõ giờ chuyến bạn chọn:"}</div>
+        <div class="g3"><label class="lab">Giờ đi<input type="time" class="rdep" value="${r?esc(r.dep):""}"></label><label class="lab">Giờ đến<input type="time" class="rarr" value="${r?esc(r.arr):""}"></label><button type="button" class="primary rsave">Lưu</button></div>
         <div class="rerr err" role="alert"></div>
-        <div class="actions"><button type="button" class="primary rsave">Lưu giờ thật</button>${r?'<button type="button" class="ghost rclear">Xoá giờ thật</button>':""}</div>
-      </details></div>`};
-    legHtml=leg("go","Lượt đi",fromT,toT,fj,tj,d1,m1,t1)+leg("back","Lượt về",toT,fromT,tj,fj,d2,m2,t2)+`<p class="note">Mở Yahoo!乗換案内, chọn chuyến bạn sẽ đi, rồi bấm "Chốt giờ thật" để lịch trình dùng đúng giờ đó.</p>`;
+        <details class="fix"><summary>Thêm giá vé, tên tàu, hoặc dán kết quả Yahoo</summary>
+          <label class="lab">Dán kết quả copy từ Yahoo (tự điền giờ, giá, tên tàu)<textarea class="rpaste" rows="2" placeholder="VD: 08:06発→13:34着 5時間28分 18,070円"></textarea></label>
+          <div class="g2"><label class="lab">Giá vé (¥)<input type="text" inputmode="numeric" class="rfare" maxlength="7" value="${r&&r.fare?esc(String(r.fare)):""}"></label><label class="lab">Tên tàu (tuỳ chọn)<input type="text" class="rline" maxlength="80" placeholder="みどり→のぞみ→バス" value="${r&&r.line?esc(r.line):""}"></label></div>
+        </details>
+        ${r?'<button type="button" class="ghost rclear">Xoá giờ đã chọn</button>':""}
+      </div>`+
+      (navKey()?`<button type="button" class="ghost navbtn" data-q="${esc(JSON.stringify({s:[f===fromT?A[2]:B[2],f===fromT?A[3]:B[3]],g:[f===fromT?B[2]:A[2],f===fromT?B[3]:A[3]],date,mode,tm}))}">🔎 Tìm chuyến NAVITIME</button>`:"")+`<div class="nres"></div></div>`};
+    legHtml=leg("go","🚩 Lượt đi",fromT,toT,fj,tj,d1,m1,t1)+leg("back","🏠 Lượt về",toT,fromT,tj,fj,d2,m2,t2);
   }
   $("legs").innerHTML=legHtml;$("legCard").classList.toggle("hidden",!legHtml);
+  // Nhật: ước tính chỉ là phụ (thu gọn); chặng khác: đây là bước 2
+  $("optWrap").open=!legHtml;$("optSum").textContent=legHtml?"🚆 Xem ước tính các phương tiện":"🚆 Phương tiện gợi ý";
   const grp={route:[],ticket:[],hotel:[]};
   for(const l of L){(/Khách sạn/.test(l[0])?grp.hotel:/NAVITIME|Chỉ đường|lộ trình/i.test(l[0])?grp.route:grp.ticket).push(l)}
   const glist=(t,a)=>a.length?`<div class="grp"><div class="lbl">${t}</div><div class="list">${a.map(l=>`<a href="${l[1]}" target="_blank" rel="noopener">${l[0].replace(/^Khách sạn - /,"")}</a>`).join("")}</div></div>`:"";
@@ -343,12 +348,16 @@ async function build(){
   if(note) days[Math.min(1,nights)].items.splice(1,0,"Ghi chú: "+note);
   cur.days=days;
   $("plan").innerHTML=days.map((d,i)=>`<div class="day"><h3>Ngày ${i+1} · ${d.label}</h3><ul class="tl">${d.items.map(x=>{const m=x.match(/^(\d\d:\d\d)\s+(.*)$/);return m?`<li class="tt"><span class="when">${m[1]}</span>${esc(m[2])}</li>`:`<li>${esc(x)}</li>`}).join("")}</ul></div>`).join("");
+  const nReal=(real.go?1:0)+(real.back?1:0),jpLeg=!!legHtml;
+  $("st1").className="done";$("st2").className=!jpLeg||nReal===2?"done":"on";$("st3").className=!jpLeg||nReal===2?"on":"";
   // 2 hero
   const bt=best.t!=null;
   $("hero").innerHTML=`<div class="od">${esc(fromT)} → ${esc(toT)}</div><div class="sub">${dmy(d1)} – ${dmy(d2)} · ${nights?nights+" đêm":"trong ngày"} · ${pax} người</div>`+
-    (bt?`<div class="big"><span class="t">${go.dep.slice(0,5)}</span><div class="line"><span>${(IC[best.k]||"")} ${go.real?fmtH(((toMin(go.arr)-toMin(go.dep))%1440+1440)%1440/60):fmtH(best.t)}</span></div><span class="t">${go.arr.slice(0,5)}</span></div><div class="sub">${go.real?`<span class="okb">${real.go.src==="navitime"?"≈ NAVITIME":"✓ Giờ thật"}</span> ${real.go.line?esc(real.go.line)+" · ":""}${real.go.fare?"¥"+Number(real.go.fare*pax).toLocaleString("ja-JP"):""}`:`Lượt đi bằng ${esc(best.n)} · ~${money(best.p*pax,best.ccy)} · giờ là ước tính, bấm "Chốt giờ thật" bên dưới`}</div>`:"");
+    (bt?`<div class="big"><span class="t">${go.dep.slice(0,5)}</span><div class="line"><span>${(IC[best.k]||"")} ${go.real?fmtH(((toMin(go.arr)-toMin(go.dep))%1440+1440)%1440/60):fmtH(best.t)}</span></div><span class="t">${go.arr.slice(0,5)}</span></div><div class="sub">${go.real?`<span class="okb">${real.go.src==="navitime"?"≈ NAVITIME":"✓ Giờ thật"}</span> ${real.go.line?esc(real.go.line)+" · ":""}${real.go.fare?"¥"+Number(real.go.fare*pax).toLocaleString("ja-JP"):""}`:`Lượt đi bằng ${esc(best.n)} · ~${money(best.p*pax,best.ccy)} · giờ là ước tính, chọn giờ thật ở bước 2`}</div>`:"")+(jpLeg?`<div class="hstat${nReal===2?" ok":""}">${nReal===2?"✓ Đã chọn giờ tàu cả lượt đi và lượt về":nReal===1?"Còn 1 lượt chưa chọn giờ tàu (bước 2)":"Bước tiếp theo: chọn giờ tàu ở bước 2 bên dưới"}</div>`:"");
   $("ai").textContent="";$("msg").textContent="";
-  $("out").classList.remove("hidden");$("out").scrollIntoView({behavior:"smooth"});
+  $("out").classList.remove("hidden");
+  $("csumT").textContent=`${fromT} → ${toT}`;$("csumD").textContent=`${dmy(d1)} – ${dmy(d2)} · ${pax} người`;$("f").classList.add("compact");
+  $("out").scrollIntoView({behavior:"smooth"});
 }
 function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 function asText(){if(!cur)return"";return `Lịch trình công tác ${cur.fromT} → ${cur.toT} (${dmy(cur.d1)} - ${dmy(cur.d2)})\nPhương tiện: ${cur.opts[0].n}\nLượt đi: ${cur.go.dep} → ${cur.go.arr}${cur.go.real?" (giờ thật)":" (ước tính)"}\nLượt về: ${cur.back.dep} → ${cur.back.arr}${cur.back.real?" (giờ thật)":" (ước tính)"}\n\n`+cur.days.map((d,i)=>`Ngày ${i+1} (${d.label})\n`+d.items.map(x=>"- "+x).join("\n")).join("\n\n")+($("ai").textContent?"\n\nGợi ý chi tiết:\n"+$("ai").textContent:"")}
