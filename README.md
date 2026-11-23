@@ -18,3 +18,11 @@ npm install
 npm run serve &   # mở http://127.0.0.1:8080
 npm test
 ```
+
+## Kế hoạch di chuyển chi tiết & cách đặt vé
+
+Khi chọn chuyến bằng nút 📥 trên Yahoo, hoặc dán toàn bộ 1 tuyến Yahoo vào ô "Dán kết quả", web đọc từng chặng (tàu/xe, ga lên–xuống, giờ, sân ga, giá, ghi chú) rồi xuất:
+
+- Kế hoạch từng bước: lên tàu nào, ở sân nào, đổi tàu ở đâu, có mấy phút, đi bộ sang bến xe nào.
+- Cách đặt vé từng chặng: Shinkansen (smart EX / えきねっと), tàu tốc hành (JR九州ネット予約 / e5489 / えきねっと), xe buýt cao tốc (trang nhà xe, 発車オーライネット, 高速バスネット), tàu thường (thẻ IC), kèm mẹo mua chung vé JR.
+- Nút Sao chép có kèm toàn bộ kế hoạch và cách đặt vé.

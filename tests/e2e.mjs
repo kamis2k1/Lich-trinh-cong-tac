@@ -317,13 +317,47 @@ await test("Nút Yahoo gửi về → mở lại lịch trình, hiện 3 chuyế
   await p.goto(BASE + yHash(T.d1)); await p.waitForSelector('.leg[data-leg="go"] .ypick');
   const t = await p.textContent('.leg[data-leg="go"] .nres');
   ok(/07:18 → 12:34/.test(t) && /18,070/.test(t) && /06:35 → 12:34/.test(t) && /17,140/.test(t), t.slice(0, 200));
-  ok(/みどり6号→のぞみ16号→しまなみライナー/.test(t), "tên tàu: " + t.slice(0, 300)); ok(/佐世保線/.test(t), "thiếu tuyến thường");
+  ok(/佐世保 07:18 特急みどり6号 → đổi ở 博多 09:15 新幹線のぞみ16号 → đổi ở 福山駅前\(高速・連絡バス\) 11:05 しまなみライナー → đến 今治 12:34/.test(t), "chỗ đổi tàu: " + t.slice(0, 400)); ok(/佐世保線/.test(t), "thiếu tuyến thường");
   ok(!(await p.evaluate(() => location.hash)), "chưa xoá dữ liệu trên thanh địa chỉ");
 });
 await test("Chọn chuyến Yahoo → lịch trình dùng giờ thật", async p => {
   await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
   await p.goto(BASE + yHash(T.d1)); await p.click('.leg[data-leg="go"] .ypick[data-i="2"]'); await p.waitForSelector('.leg[data-leg="go"].done');
   ok(/06:35\s*khởi hành.*lúc 12:34/.test(await p.textContent("#plan")), "lịch trình chưa cập nhật"); ok(/Giờ thật/.test(await p.textContent("#hero")), "thiếu nhãn");
+});
+await test("Chọn chuyến Yahoo → kế hoạch từng bước: đổi tàu ở đâu, sân ga, cách đặt vé", async p => {
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  await p.goto(BASE + yHash(T.d1)); await p.click('.leg[data-leg="go"] .ypick[data-i="0"]'); await p.waitForSelector('.leg[data-leg="go"].done');
+  ok(await p.isVisible("#moveCard"), "không hiện thẻ kế hoạch");
+  const m = await p.textContent("#move");
+  for (const re of [/07:18.*Lên 特急みどり6号 \(đi 博多\) tại 佐世保/, /09:02.*Xuống tại 博多 · 1番線/, /Đổi tàu tại 博多: có 13 phút, từ sân 1番線 sang 13番線/, /09:15.*Lên 新幹線のぞみ16号 \(đi 東京\) tại 博多 · 13番線/,
+    /Đi bộ từ 福山 sang 福山駅前\(高速・連絡バス\) \(~3 phút\), chờ 19 phút ở 南口3のりば/, /11:05.*しまなみライナー/, /Đến 今治/, /đổi 2 lần/, /乗車券/])
+    ok(re.test(m), "thiếu: " + re + "\n" + m.slice(0, 900));
+  const links = await p.$$eval("#move .bkl a", a => a.map(x => x.textContent + "|" + x.href));
+  ok(links.some(x => /JR九州ネット予約/.test(x)), "thiếu JR九州 cho みどり"); ok(links.some(x => /smart EX.*smart-ex\.jp/.test(x)), "thiếu smart EX");
+  ok(links.some(x => /しまなみライナー.*google/.test(x)), "thiếu link đặt xe buýt");
+  const needs = await p.$$eval("#move .need", a => a.map(x => x.textContent)); ok(needs.length === 3 && needs[2] === "Nên đặt trước", needs.join(","));
+  ok(/Đổi tàu\/xe: .*博多/.test(await p.textContent("#plan")), "lịch trình thiếu chỗ đổi tàu");
+  ok(/Lượt về[\s\S]*Chưa chọn chuyến/.test(m), "lượt về chưa chọn phải có hướng dẫn");
+  await p.context().grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => {});
+  await p.click("#copy"); const c = await p.evaluate(() => navigator.clipboard.readText()).catch(() => "");
+  if (c) ok(/Kế hoạch di chuyển Lượt đi[\s\S]*Cách đặt vé[\s\S]*smart-ex/.test(c), "bản sao chép thiếu kế hoạch");
+});
+await test("Dán toàn bộ 1 tuyến Yahoo rồi Lưu → có chi tiết chặng; gõ tay giờ khác → nhắc dán", async p => {
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  await p.$eval('.leg[data-leg="go"] .fix', e => e.open = true);
+  await p.fill('.leg[data-leg="go"] .rpaste', YS.r[2]); await p.click('.leg[data-leg="go"] .rsave'); await p.waitForSelector('.leg[data-leg="go"].done');
+  let m = await p.textContent("#move"); ok(/06:35.*Lên 佐世保線/.test(m) && /新鳥栖: có 44 phút/.test(m), m.slice(0, 500));
+  ok(/Không cần đặt/.test(m), "tàu thường phải ghi không cần đặt");
+  await p.fill('.leg[data-leg="go"] .rdep', "08:00"); await p.fill('.leg[data-leg="go"] .rarr', "13:00"); await p.click('.leg[data-leg="go"] .rsave');
+  await p.waitForFunction(() => /Mới có giờ đi\/đến/.test(document.getElementById("move").textContent));
+});
+await test("Kế hoạch: tên tàu/ga có mã độc không chạy", async p => {
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  const bad = YS.r[0].replace("ＪＲ特急みどり6号", '<img src=x onerror="window.__m=1">').replace("博多時刻表", '<b onmouseover=x>博多');
+  await p.goto(BASE + "#yahoo=" + encodeURIComponent(JSON.stringify({ ...YS, d: T.d1, r: [bad] })));
+  await p.click('.leg[data-leg="go"] .ypick'); await p.waitForSelector("#move .bk");
+  ok(!(await p.evaluate(() => window.__m)), "mã đã chạy!"); ok(!(await p.$("#move img, #move b[onmouseover]")), "chèn được thẻ HTML");
 });
 await test("Chuyến Yahoo ngày về → tự gán vào lượt về", async p => {
   await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });

@@ -165,9 +165,74 @@ function parseYahoo(t){
   const f=t.match(/(?:IC優先|きっぷ優先|現金優先)?[：:\s]*([\d,]{3,9})\s*円/);
   const pad=x=>x.padStart(5,"0");
   const names=[...t.matchAll(/(?:ＪＲ|JR)[^\s]+|(?:特急|新幹線|快速|高速バス|空港バス)[^\s]*/g)].map(x=>{let v=x[0].replace(/^(ＪＲ|JR)/,"");if(/バス/.test(v)&&v.includes("・"))v=v.split("・").pop();return v.replace(/^新幹線/,"")}).filter((v,i,a)=>v&&a.indexOf(v)===i).slice(0,4);
-  return {dep:m?pad(m[1]):"",arr:m?pad(m[2]):"",fare:f?f[1].replace(/,/g,""):"",line:names.join("→")};
+  return {dep:m?pad(m[1]):"",arr:m?pad(m[2]):"",fare:f?f[1].replace(/,/g,""):"",line:names.join("→"),segs:parseSegments(t)};
 }
-document.addEventListener("input",e=>{if(!e.target.classList.contains("rpaste"))return;const box=e.target.closest(".leg"),r=parseYahoo(e.target.value);
+// Đọc từng chặng (tàu/xe, ga lên–xuống, giờ, sân ga, giá) từ chữ copy của 1 tuyến Yahoo
+function parseSegments(t){
+  t=(t||"").replace(/[０-９Ａ-Ｚａ-ｚ：，（）［］]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+  const L=t.split("\n").map(s=>s.replace(/\t/g," ").replace(/\s+/g," ").trim()).filter(Boolean);
+  const st=s=>s.replace(/(?:時刻表|出口|地図|\s)+$/,"").slice(0,40),pad=x=>x.padStart(5,"0");
+  const T=/^(\d{1,2}:\d{2})$/,SKIP=/^(その他|きっぷ購入|PR|ルート保存|定期券|ルート共有|印刷する|乗車位置|IC優先|現金優先|きっぷ優先|乗換|早|楽|安)/;
+  let i=L.findIndex((s,k)=>(T.test(s)&&/^発 /.test(L[k+1]||""))||/^\d{1,2}:\d{2} 発 \S/.test(s));
+  if(i<0)return[];
+  const segs=[];let cur=null;
+  const node=(arr,dep,name)=>{name=st(name);if(cur){cur.arr=arr||cur.arr;cur.to=name;segs.push(cur);cur=null}if(dep)cur={dep,from:name,line:"",dest:"",pf:"",pt:"",stops:0,fares:[],note:""}};
+  for(;i<L.length&&segs.length<12;i++){const s=L[i];let m;
+    if(T.test(s)&&(m=(L[i+1]||"").match(/^(発|着) (.+)/))){const tm=pad(s);m[1]==="発"?node("",tm,m[2]):node(tm,"",m[2]);i++;if(m[1]==="着")break;continue}
+    if((m=s.match(/^(\d{1,2}:\d{2}) (発|着) (.+)/))){const tm=pad(m[1]);m[2]==="発"?node("",tm,m[3]):node(tm,"",m[3]);if(m[2]==="着")break;continue}
+    if((m=s.match(/^(\d{1,2}:\d{2})着$/))&&(L[i+1]||"").match(/^(\d{1,2}:\d{2})発$/)&&L[i+2]){node(pad(m[1]),pad(L[i+1].slice(0,-1)),L[i+2]);i+=2;continue}
+    if(!cur||SKIP.test(s))continue;
+    if(!cur.line){cur.line=s.slice(0,60);continue}
+    if((m=s.match(/^\[発\]\s*(.*?)\s*→\s*\[着\]\s*(.*)$/))){const f=x=>/情報なし/.test(x)?"":x.slice(0,20);cur.pf=f(m[1]);cur.pt=f(m[2]);continue}
+    if((m=s.match(/^(\d{1,3})駅$/))){cur.stops=+m[1];continue}
+    if((m=s.match(/^(?:(自由席|指定席|グリーン|特急券|座席)[^：:]*[：:])?\s*([\d,]{3,9})円$/))){cur.fares.push({k:m[1]||"",v:+m[2].replace(/,/g,"")});continue}
+    if((m=s.match(/^注記\s*(.+)/))){cur.note=m[1].slice(0,40);continue}
+    if(/行$/.test(s)&&!cur.dest){cur.dest=s.replace(/^当駅始発/,"").slice(0,30);continue}
+  }
+  return segs.map(g=>({...g,line:g.line.replace(/^JR/,"JR ").trim(),kind:segKind(g.line)}));
+}
+function segKind(n){return /^徒歩/.test(n)?"walk":/新幹線/.test(n)?"shin":/空路|航空|ANA|JAL|ピーチ|ジェットスター|スカイマーク/.test(n)?"fly":/高速バス|夜行バス/.test(n)?"hbus":/フェリー|汽船|高速船|航路/.test(n)?"ferry":/バス/.test(n)?"bus":/特急|ライナー|エクスプレス/.test(n)?"ltd":"train"}
+const SEG_IC={walk:"🚶",shin:"🚄",ltd:"🚆",train:"🚃",hbus:"🚌",bus:"🚌",fly:"✈️",ferry:"⛴️"};
+// tên ngắn để hiển thị: bỏ JR, lấy tên chuyến xe buýt
+const segName=g=>{let v=g.line.replace(/^JR\s*/,"");if(/バス/.test(v)&&v.includes("・"))v=v.split("・").pop();return v};
+// Cách đặt vé cho từng loại chặng
+const BK={smartex:["smart EX (EX予約)","https://smart-ex.jp/"],ekinet:["えきねっと (JR東日本)","https://www.eki-net.com/"],e5489:["e5489 (JR西日本・四国)","https://www.jr-odekake.net/goyoyaku/"],kyushu:["JR九州ネット予約","https://train.yoyaku.jrkyushu.co.jp/"]};
+const KYUSHU=/みどり|ハウステンボス|かもめ|ソニック|きらめき|にちりん|ひゅうが|きりしま|ゆふ|有明|あそ|かわせみ|指宿|36ぷらす3|いさぶろう|海幸山幸/,EAST=/ひたち|ときわ|あずさ|かいじ|踊り子|成田エクスプレス|しおさい|わかしお|さざなみ|草津|つがる|いなほ|日光|きぬがわ|富士回遊|はちおうじ|おうめ|湘南/,
+  EAST_SHIN=/はやぶさ|はやて|やまびこ|なすの|こまち|つばさ|とき|たにがわ|かがやき|はくたか|あさま|つるぎ/;
+function bookingFor(g){
+  const n=g.line,fr=g.fares.find(f=>f.k)||null,note=g.note?` Yahoo ghi chú: ${g.note}.`:"";
+  const q=encodeURIComponent(segName(g)+" 予約");
+  if(g.kind==="shin"){
+    if(EAST_SHIN.test(n))return{need:"Nên đặt trước",how:"Đặt chỗ trên えきねっと (vé điện tử, quẹt thẻ IC qua cửa) hoặc mua ở máy 指定席券売機 / quầy みどりの窓口.",links:[BK.ekinet]};
+    if(/かもめ/.test(n))return{need:"Nên đặt trước",how:"西九州新幹線 かもめ: đặt trên JR九州ネット予約 hoặc mua ở ga.",links:[BK.kyushu]};
+    return{need:fr&&fr.k==="自由席"?"Không bắt buộc (自由席)":"Nên đặt trước",how:`Đặt chỗ trên smart EX (vé điện tử, dùng thẻ IC qua cửa, rẻ hơn vé giấy một chút) hoặc mua ở máy 指定席券売機 / quầy みどりの窓口. ${fr&&fr.k==="自由席"?"Giá Yahoo đang tính ghế tự do (自由席): có thể lên tàu không cần đặt chỗ, nhưng giờ cao điểm nên đặt 指定席.":""}`.trim(),links:[BK.smartex]};
+  }
+  if(g.kind==="ltd"){
+    const reg=KYUSHU.test(n)?[BK.kyushu]:EAST.test(n)?[BK.ekinet]:[BK.e5489,BK.ekinet];
+    return{need:fr&&fr.k==="自由席"?"Không bắt buộc (có ghế tự do)":"Nên đặt trước",how:`Tàu tốc hành (特急) cần thêm vé 特急券 ngoài vé đi tàu. Đặt online trên ${reg.map(x=>x[0]).join(" hoặc ")}, hoặc mua ở máy 指定席券売機 tại ga trước giờ tàu.${fr&&fr.k==="自由席"?" Ghế tự do (自由席) mua tại ga là lên được.":""}`,links:reg};
+  }
+  if(g.kind==="hbus")return{need:/予約/.test(g.note)?"Nên đặt trước":"Nên đặt trước",how:`Xe buýt cao tốc: đặt chỗ trên trang của nhà xe hoặc 発車オーライネット / 高速バスネット, thanh toán online hoặc trả tiền khi lên xe tuỳ tuyến. Ra bến${g.pf?` ${g.pf}`:""} trước 10 phút.${note}`,links:[["Tìm trang đặt "+segName(g),"https://www.google.com/search?q="+q],["発車オーライネット","https://secure.j-bus.co.jp/hon"],["高速バスネット","https://www.kousokubus.net/"]]};
+  if(g.kind==="fly")return{need:"Phải đặt trước",how:"Đặt vé máy bay trên trang hãng hoặc Google Flights; có mặt ở sân bay trước 60 phút (nội địa).",links:[["Google Flights","https://www.google.com/travel/flights?hl=vi"]]};
+  if(g.kind==="ferry")return{need:"Tuỳ tuyến",how:`Tàu thuỷ/phà: phần lớn mua vé ở bến; tuyến đông khách nên đặt trước trên trang hãng.${note}`,links:[["Tìm trang "+segName(g),"https://www.google.com/search?q="+q]]};
+  if(g.kind==="bus")return{need:"Không cần đặt",how:"Xe buýt thường: quẹt thẻ IC (Suica/ICOCA…) hoặc trả tiền mặt khi xuống xe.",links:[]};
+  return{need:"Không cần đặt",how:"Tàu thường: quẹt thẻ IC (Suica/ICOCA…) hoặc mua vé ở máy bán vé. Nếu chặng này nối với tàu JR tốc hành, có thể mua chung 1 vé đi tàu (乗車券) cho cả quãng.",links:[]};
+}
+// Các bước đi cụ thể của 1 lượt
+function segSteps(segs){
+  const out=[];const mm=(a,b)=>((toMin(b)-toMin(a))%1440+1440)%1440;
+  segs.forEach((g,k)=>{const nx=segs[k+1],pv=segs[k-1];
+    if(g.kind==="walk"){const w=nx&&nx.dep?mm(g.arr,nx.dep):0;out.push({ic:"🚶",t:g.dep,txt:`Đi bộ từ ${g.from} sang ${g.to} (~${mm(g.dep,g.arr)||1} phút)${nx?`, chờ ${w} phút${nx.pf?` ở ${nx.pf}`:""}`:""}`});return}
+    if(pv&&pv.kind!=="walk"&&pv.arr)out.push({ic:"🔁",t:"",txt:`Đổi tàu tại ${g.from}: có ${mm(pv.arr,g.dep)} phút${pv.pt&&g.pf?`, từ sân ${pv.pt} sang ${g.pf}`:g.pf?`, sang ${g.pf}`:""}`,chg:true});
+    out.push({ic:SEG_IC[g.kind]||"🚃",t:g.dep,txt:`Lên ${segName(g)}${g.dest?` (đi ${g.dest.replace(/行$/,"")})`:""} tại ${g.from}${g.pf?` · ${g.pf}`:""}`,seg:k});
+    out.push({ic:"⬇",t:g.arr,txt:`Xuống tại ${g.to}${g.pt?` · ${g.pt}`:""}${g.stops?` (${g.stops} ga)`:""}`});
+  });
+  return out;
+}
+// Mẹo mua chung vé JR cho các chặng JR liền nhau
+function jrTip(segs){const j=segs.map((g,k)=>/^JR/.test(g.line)?k:-1).filter(k=>k>=0);if(j.length<2)return"";
+  const a=segs[j[0]].from,b=segs[j[j.length-1]].to;
+  return `Các chặng JR từ ${a} đến ${b} đi liền nhau: chỉ cần 1 vé đi tàu (乗車券) ${a}→${b} cộng vé tốc hành (特急券) cho từng tàu. Cách dễ nhất: ra máy 指定席券売機 hoặc quầy みどりの窓口 ở ga ${a}, đưa màn hình kế hoạch này để mua một lần.`}
+document.addEventListener("input",e=>{if(!e.target.classList.contains("rpaste"))return;const box=e.target.closest(".leg"),r=parseYahoo(e.target.value);box._segs=r.segs;
   if(r.dep)box.querySelector(".rdep").value=r.dep;if(r.arr)box.querySelector(".rarr").value=r.arr;if(r.fare)box.querySelector(".rfare").value=r.fare;if(r.line&&!box.querySelector(".rline").value)box.querySelector(".rline").value=r.line});
 document.addEventListener("click",e=>{
   const sv=e.target.closest(".rsave"),cl=e.target.closest(".rclear");if(!(sv||cl)||!cur)return;
@@ -177,7 +242,8 @@ document.addEventListener("click",e=>{
     const okT=t=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t);
     if(!okT(dep)||!okT(arr)){err.textContent="Nhập đủ giờ đi và giờ đến (dạng 08:06).";return}
     if(fareS&&!/^\d{1,7}$/.test(fareS)){err.textContent="Giá vé chỉ gồm chữ số.";return}
-    data[key]={dep,arr,fare:fareS?Number(fareS):0,line}}
+    const old=data[key],ps=box._segs&&box._segs.length?box._segs:old&&old.segs,segOk=ps&&ps.length&&ps[0].dep===dep&&ps[ps.length-1].arr===arr;
+    data[key]={dep,arr,fare:fareS?Number(fareS):0,line};if(segOk)data[key].segs=ps}
   store.set(realKey(cur),data);
   build().then(()=>{const el=document.querySelector(`.leg[data-leg="${key}"]`);el&&el.scrollIntoView({block:"center"})});
 });
@@ -300,7 +366,7 @@ async function build(){
   if(A&&B&&A[5]==="JP"&&B[5]==="JP"){
     const fj=jaName(A,fromT),tj=jaName(B,toT);
     const leg=(key,lbl,f,t,fJ,tJ,date,mode,tm)=>{const r=real[key];const [yy,mm,dd]=date.split("-").map(Number);return `<div class="leg${r?" done":""}" data-leg="${key}"><div class="h">${lbl} · ${wd[new Date(yy,mm-1,dd).getDay()]}, ${dmy(date)} <small>(${mode==="arr"?"đến trước":"đi lúc"} ${tm})</small></div>`+
-      (r?`<div class="realbox">${r.src==="navitime"?"≈ Giờ NAVITIME (trung bình)":"✓ Đã chọn"}: <b>${esc(r.dep)} → ${esc(r.arr)}</b>${r.line?` · ${esc(r.line)}`:""}${r.fare?` · ¥${Number(r.fare).toLocaleString("ja-JP")}`:""}</div>`:"")+
+      (r?`<div class="realbox">${r.src==="navitime"?"≈ Giờ NAVITIME (trung bình)":"✓ Đã chọn"}: <b>${esc(r.dep)} → ${esc(r.arr)}</b>${r.line?` · ${esc(r.line)}`:""}${r.fare?` · ¥${Number(r.fare).toLocaleString("ja-JP")}`:""}${okSegs(r)?`<div class="chg">${esc(chgLine(r.segs))}</div>`:`<div class="chg muted">Muốn biết đổi tàu ở đâu, sân ga, cách đặt vé? Dán toàn bộ 1 tuyến Yahoo vào ô bên dưới, hoặc dùng nút 📥 trên trang Yahoo.</div>`}</div>`:"")+
       `<div class="btns">${routeLinks(f,t,fJ,tJ,date,mode,tm,best0.t).map((l,k)=>`<a class="${k===0?"pri":""}" href="${l[1]}" target="_blank" rel="noopener">${k===0?"Mở Yahoo xem chuyến ↗":l[0]}</a>`).join("")}</div>`+
       `<div class="pick"><div class="lbl2">${r?"Đổi chuyến khác? Gõ lại giờ:":"Gõ giờ chuyến bạn chọn:"}</div>
         <div class="g3"><label class="lab">Giờ đi<input type="time" class="rdep" value="${r?esc(r.dep):""}"></label><label class="lab">Giờ đến<input type="time" class="rarr" value="${r?esc(r.arr):""}"></label><button type="button" class="primary rsave">Lưu</button></div>
@@ -345,10 +411,13 @@ async function build(){
     else items=[`Ngày làm việc ${i} tại ${tN}`,local,jpDest?"Tối: tổng hợp biên bản, gửi báo cáo; nhớ danh thiếp (meishi) cho buổi hẹn":"Tối: tổng hợp biên bản, gửi báo cáo nhanh"];
     days.push({label,items});
   }
+  const chgItem=r=>okSegs(r)&&r.segs.filter(g=>g.kind!=="walk").length>1?`Đổi tàu/xe: ${chgLine(r.segs)} (chi tiết ở mục Kế hoạch di chuyển)`:"";
+  {const a=chgItem(real.go);if(a)days[0].items.splice(1,0,a);const b=chgItem(real.back);if(b){const it=days[nights].items;it.push(b)}}
   if(note) days[Math.min(1,nights)].items.splice(1,0,"Ghi chú: "+note);
   cur.days=days;
   $("plan").innerHTML=days.map((d,i)=>`<div class="day"><h3>Ngày ${i+1} · ${d.label}</h3><ul class="tl">${d.items.map(x=>{const m=x.match(/^(\d\d:\d\d)\s+(.*)$/);return m?`<li class="tt"><span class="when">${m[1]}</span>${esc(m[2])}</li>`:`<li>${esc(x)}</li>`}).join("")}</ul></div>`).join("");
   const nReal=(real.go?1:0)+(real.back?1:0),jpLeg=!!legHtml;
+  $("moveCard").classList.toggle("hidden",!jpLeg);$("move").innerHTML=jpLeg?moveHtml("go","🚩 Lượt đi",d1,fromT,toT)+moveHtml("back","🏠 Lượt về",d2,toT,fromT):"";
   $("st1").className="done";$("st2").className=!jpLeg||nReal===2?"done":"on";$("st3").className=!jpLeg||nReal===2?"on":"";
   // 2 hero
   const bt=best.t!=null;
@@ -359,8 +428,28 @@ async function build(){
   $("csumT").textContent=`${fromT} → ${toT}`;$("csumD").textContent=`${dmy(d1)} – ${dmy(d2)} · ${pax} người`;$("f").classList.add("compact");
   $("out").scrollIntoView({behavior:"smooth"});
 }
+const okSegs=r=>!!(r&&Array.isArray(r.segs)&&r.segs.length&&r.segs.every(g=>g&&typeof g.dep==="string"&&typeof g.line==="string"));
+// "07:18 佐世保 → [đổi] 博多 09:15 → 福山駅前 11:05 → 今治 12:34"
+function chgLine(segs){const v=segs.filter(g=>g.kind!=="walk");if(!v.length)return"";
+  return [`${v[0].from} ${v[0].dep} ${segName(v[0])}`,...v.slice(1).map(g=>`đổi ở ${g.from} ${g.dep} ${segName(g)}`),`đến ${segs[segs.length-1].to} ${segs[segs.length-1].arr}`].join(" → ")}
+function moveHtml(key,lbl,date,f,t){const r=cur&&cur.real&&cur.real[key];
+  const h=`<h3>${lbl} · ${dmy(date)}${r?` · <span class="t">${esc(r.dep)} → ${esc(r.arr)}</span>`:""}</h3>`;
+  if(!r)return `<div class="mv">${h}<p class="muted">Chưa chọn chuyến. Chọn giờ tàu ở bước 2 để có kế hoạch chi tiết.</p></div>`;
+  if(!okSegs(r))return `<div class="mv">${h}<p class="muted">Mới có giờ đi/đến${r.line?` (${esc(r.line)})`:""}. Để biết đổi tàu ở đâu, sân ga và cách đặt vé từng chặng: bấm nút 📥 trên trang Yahoo, hoặc copy toàn bộ 1 tuyến trên Yahoo rồi dán vào ô "Dán kết quả" ở bước 2.</p></div>`;
+  const segs=r.segs,v=segs.filter(g=>g.kind!=="walk"),steps=segSteps(segs),tip=jrTip(segs);
+  return `<div class="mv">${h}<div class="sub muted">${esc(f)} → ${esc(t)} · đổi ${Math.max(0,v.length-1)} lần${r.fare?` · ¥${Number(r.fare).toLocaleString("ja-JP")}/người`:""}</div>
+    <ul class="tl">${steps.map(x=>`<li class="${x.t?"tt":""}${x.chg?" chgli":""}">${x.t?`<span class="when">${esc(x.t)}</span>`:""}${x.ic} ${esc(x.txt)}</li>`).join("")}<li class="tt"><span class="when">${esc(segs[segs.length-1].arr)}</span>🏁 Đến ${esc(segs[segs.length-1].to)}</li></ul>
+    <h4>🎫 Cách đặt vé lượt này</h4>${tip?`<p class="tip">💡 ${esc(tip)}</p>`:""}
+    ${v.map(g=>{const b=bookingFor(g),fr=g.fares.find(x=>x.k);return `<div class="bk"><div class="bkh">${SEG_IC[g.kind]||"🚃"} <b>${esc(segName(g))}</b> <span class="muted">${esc(g.from)} ${esc(g.dep)} → ${esc(g.to)} ${esc(g.arr)}</span> <span class="need${/Không/.test(b.need)?" no":""}">${esc(b.need)}</span></div>
+      <div class="bkb">${esc(b.how)}${fr?` <span class="muted">(${esc(fr.k)} ¥${Number(fr.v).toLocaleString("ja-JP")})</span>`:""}</div>${b.links.length?`<div class="bkl">${b.links.map(l=>`<a href="${esc(l[1])}" target="_blank" rel="noopener">${esc(l[0])} ↗</a>`).join("")}</div>`:""}</div>`}).join("")}</div>`}
+function moveText(){if(!cur||!cur.real)return"";let o="";
+  for(const [k,l] of [["go","Lượt đi"],["back","Lượt về"]]){const r=cur.real[k];if(!okSegs(r))continue;
+    o+=`\n\n=== Kế hoạch di chuyển ${l} (${r.dep} → ${r.arr}) ===\n`+segSteps(r.segs).map(x=>`${x.t||"     "} ${x.txt}`).join("\n")+`\n${r.segs[r.segs.length-1].arr} Đến ${r.segs[r.segs.length-1].to}\n\nCách đặt vé:\n`;
+    const tip=jrTip(r.segs);if(tip)o+=`* ${tip}\n`;
+    o+=r.segs.filter(g=>g.kind!=="walk").map(g=>{const b=bookingFor(g);return `- ${segName(g)} (${g.from} ${g.dep} → ${g.to} ${g.arr}): ${b.need}. ${b.how}${b.links.length?" "+b.links.map(x=>x[1]).join(" "):""}`}).join("\n")}
+  return o}
 function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
-function asText(){if(!cur)return"";return `Lịch trình công tác ${cur.fromT} → ${cur.toT} (${dmy(cur.d1)} - ${dmy(cur.d2)})\nPhương tiện: ${cur.opts[0].n}\nLượt đi: ${cur.go.dep} → ${cur.go.arr}${cur.go.real?" (giờ thật)":" (ước tính)"}\nLượt về: ${cur.back.dep} → ${cur.back.arr}${cur.back.real?" (giờ thật)":" (ước tính)"}\n\n`+cur.days.map((d,i)=>`Ngày ${i+1} (${d.label})\n`+d.items.map(x=>"- "+x).join("\n")).join("\n\n")+($("ai").textContent?"\n\nGợi ý chi tiết:\n"+$("ai").textContent:"")}
+function asText(){if(!cur)return"";return `Lịch trình công tác ${cur.fromT} → ${cur.toT} (${dmy(cur.d1)} - ${dmy(cur.d2)})\nPhương tiện: ${cur.opts[0].n}\nLượt đi: ${cur.go.dep} → ${cur.go.arr}${cur.go.real?" (giờ thật)":" (ước tính)"}\nLượt về: ${cur.back.dep} → ${cur.back.arr}${cur.back.real?" (giờ thật)":" (ước tính)"}\n\n`+cur.days.map((d,i)=>`Ngày ${i+1} (${d.label})\n`+d.items.map(x=>"- "+x).join("\n")).join("\n\n")+moveText()+($("ai").textContent?"\n\nGợi ý chi tiết:\n"+$("ai").textContent:"")}
 $("copy").onclick=async()=>{try{await navigator.clipboard.writeText(asText());$("msg").textContent="Đã sao chép."}catch{$("msg").textContent="Trình duyệt chặn sao chép, hãy bôi đen để copy."}};
 
 function loadSaved(){try{return JSON.parse(localStorage.getItem("trips")||"[]")}catch{return[]}}
@@ -370,7 +459,7 @@ $("saved").onclick=e=>{const s=loadSaved();if(e.target.dataset.i){const t=s[e.ta
   if(e.target.dataset.del){s.splice(+e.target.dataset.del,1);try{localStorage.setItem("trips",JSON.stringify(s))}catch{}renderSaved()}};
 renderSaved();renderPlaces();renderNav();
 // ===== Nhận chuyến gửi từ trang Yahoo (nút bookmark) =====
-const BM=`javascript:(()=>{var p=new URL(location.href).searchParams,t=document.body.innerText,c=t.split(/\\nルート\\d+\\n/).filter(x=>/\\d{1,2}:\\d{2}発→\\d{1,2}:\\d{2}着/.test(x)).slice(0,6).map(x=>x.slice(0,900));if(!/transit\\.yahoo\\.co\\.jp/.test(location.host)||!c.length){alert('Hãy mở trang KẾT QUẢ tìm đường của Yahoo!乗換案内 rồi bấm lại.');return}var z=n=>('0'+n).slice(-2);location.href='${location.origin+location.pathname}\\x23yahoo='+encodeURIComponent(JSON.stringify({d:p.get('y')+'-'+z(p.get('m'))+'-'+z(p.get('d')),f:p.get('from')||'',t:p.get('to')||'',r:c}))})()`;
+const BM=`javascript:(()=>{var p=new URL(location.href).searchParams,t=document.body.innerText,c=t.split(/\\nルート\\d+\\n/).filter(x=>/\\d{1,2}:\\d{2}発→\\d{1,2}:\\d{2}着/.test(x)).slice(0,5).map(x=>{x=x.replace(/\\n乗車位置：[^\\n]*/g,'');var i=x.search(/\\t着\\t/),j=i>0?x.indexOf('\\n',i):-1;return(j>0?x.slice(0,j):x).slice(0,3000)});if(!/transit\\.yahoo\\.co\\.jp/.test(location.host)||!c.length){alert('Hãy mở trang KẾT QUẢ tìm đường của Yahoo!乗換案内 rồi bấm lại.');return}var z=n=>('0'+n).slice(-2);location.href='${location.origin+location.pathname}\\x23yahoo='+encodeURIComponent(JSON.stringify({d:p.get('y')+'-'+z(p.get('m'))+'-'+z(p.get('d')),f:p.get('from')||'',t:p.get('to')||'',r:c}))})()`;
 $("bmLink").href=BM;
 $("bmLink").addEventListener("click",e=>{e.preventDefault();$("bmMsg").textContent="Đừng bấm nút ở đây. Hãy kéo nút lên thanh dấu trang (Favorites bar), rồi bấm nó khi đang ở trang kết quả Yahoo.";$("bmMsg").style.color="#d93025"});
 $("bmCopy").onclick=async()=>{try{await navigator.clipboard.writeText(BM);$("bmMsg").textContent="Đã copy mã nút."}catch{$("bmMsg").textContent="Không copy được, hãy giữ lâu vào nút để copy link."}};
@@ -379,7 +468,7 @@ async function receiveYahoo(){
   history.replaceState(null,"",location.pathname+location.search);
   let y;try{y=JSON.parse(decodeURIComponent(h.slice(7)))}catch{return setErr("Dữ liệu gửi từ Yahoo bị lỗi, hãy bấm nút lại.")}
   if(!y||!Array.isArray(y.r)||!/^\d{4}-\d{2}-\d{2}$/.test(y.d||""))return setErr("Dữ liệu gửi từ Yahoo bị lỗi, hãy bấm nút lại.");
-  const routes=y.r.slice(0,6).map(t=>parseYahoo(String(t).slice(0,1500))).filter(r=>r.dep&&r.arr);
+  const routes=y.r.slice(0,6).map(t=>parseYahoo(String(t).slice(0,4000))).filter(r=>r.dep&&r.arr);
   const L=store.get("last");
   if(!L)return setErr("Hãy lập lịch trình trên web trước, rồi mới gửi chuyến từ Yahoo về.");
   $("from").value=L.fromT;$("to").value=L.toT;$("d1").value=L.d1;$("d2").value=L.d2;$("pax").value=L.pax;$("pref").value=L.pref;$("note").value=L.note||"";$("m1").value=L.m1;$("t1").value=L.t1;$("m2").value=L.m2;$("t2").value=L.t2;
@@ -392,12 +481,12 @@ async function receiveYahoo(){
   const out=box.querySelector(".nres")||box.insertBefore(Object.assign(document.createElement("div"),{className:"nres"}),box.querySelector(".fix"));
   out._rs=routes.map(r=>({...r,parts:[],yahoo:true}));
   out.innerHTML=`<div class="realbox">📥 Nhận ${routes.length} chuyến từ Yahoo (${esc(y.f)} → ${esc(y.t)}, ${dmy(y.d)}). Chọn chuyến bạn sẽ đi:</div>`+
-    routes.map((r,i)=>`<div class="nr"><div class="tt">${esc(r.dep)} → ${esc(r.arr)}${r.fare?` <span class="muted">· ¥${Number(r.fare).toLocaleString("ja-JP")}</span>`:""}</div><div class="ln">${esc(r.line||"")}</div><button type="button" class="primary ypick" data-i="${i}">Chọn chuyến này</button></div>`).join("");
+    routes.map((r,i)=>`<div class="nr"><div class="tt">${esc(r.dep)} → ${esc(r.arr)}${r.fare?` <span class="muted">· ¥${Number(r.fare).toLocaleString("ja-JP")}</span>`:""}</div><div class="ln">${esc(r.segs.length?chgLine(r.segs):r.line||"")}</div><button type="button" class="primary ypick" data-i="${i}">Chọn chuyến này</button></div>`).join("");
   box.scrollIntoView({block:"start"});
 }
 document.addEventListener("click",async e=>{const pk=e.target.closest(".ypick");if(!pk||!cur)return;
   const box=pk.closest(".leg"),r=box.querySelector(".nres")._rs[+pk.dataset.i],data=store.get(realKey(cur))||{};
-  data[box.dataset.leg]={dep:r.dep,arr:r.arr,fare:r.fare?Number(r.fare):0,line:(r.line||"").slice(0,80)};
+  data[box.dataset.leg]={dep:r.dep,arr:r.arr,fare:r.fare?Number(r.fare):0,line:(r.line||"").slice(0,80)};if(r.segs&&r.segs.length)data[box.dataset.leg].segs=r.segs;
   store.set(realKey(cur),data);await build();const el=document.querySelector(`.leg[data-leg="${box.dataset.leg}"]`);el&&el.scrollIntoView({block:"center"})});
 receiveYahoo();
 window.addEventListener("hashchange",receiveYahoo);

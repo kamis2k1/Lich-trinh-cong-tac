@@ -114,6 +114,16 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
 .nr button{padding:6px 12px;min-height:36px;font-size:.85rem}
 .nb{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:1px 8px;font-size:.75rem;font-weight:700}
 .leg.done{border-color:var(--ok)}
+.chg{margin-top:4px;font-size:.84rem;color:var(--ink)}
+.mv{margin-top:10px}.mv+.mv{border-top:1px solid var(--line);padding-top:12px;margin-top:14px}
+.mv h3{font-size:.95rem;margin:0 0 2px;color:var(--accent)}.mv h3 .t{font-variant-numeric:tabular-nums;color:var(--ink)}
+.mv .sub{font-size:.84rem;margin-bottom:8px}.mv h4{font-size:.9rem;margin:10px 0 6px}
+.tl li.chgli{color:var(--muted);font-size:.88rem}
+.tip{background:var(--accent-soft);border-radius:8px;padding:8px 10px;font-size:.86rem;margin:0 0 8px}
+.bk{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:6px;overflow-wrap:anywhere}
+.bkh{font-size:.9rem}.bkb{font-size:.86rem;margin-top:4px}
+.need{display:inline-block;font-size:.72rem;font-weight:700;border-radius:99px;padding:1px 8px;background:#f59e0b;color:#fff;vertical-align:1px}.need.no{background:var(--ok)}
+.bkl{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.bkl a{padding:8px 10px;border-radius:8px;background:var(--accent-soft);color:var(--accent);text-decoration:none;font-weight:600;font-size:.84rem}
 .realbox{background:var(--ok-soft);color:var(--ok);padding:8px 10px;border-radius:8px;margin-bottom:8px;font-size:.9rem;overflow-wrap:anywhere}
 .realbox b{font-variant-numeric:tabular-nums}
 .okb{display:inline-block;background:var(--ok);color:#fff;border-radius:99px;padding:1px 8px;font-size:.75rem;font-weight:700}
@@ -195,6 +205,7 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
       <p class="note">Thời gian và giá ở đây là ước tính theo khoảng cách.</p></details></div>
     <div class="card"><h2 class="sh"><span class="num">3</span> Lịch trình của bạn</h2><div id="plan"></div>
       <div class="actions"><button class="primary" type="button" id="save">☆ Lưu chuyến</button><button class="ghost" type="button" id="copy">Sao chép</button><span id="msg" class="muted"></span></div></div>
+    <div class="card hidden" id="moveCard"><h2>🧭 Kế hoạch di chuyển &amp; cách đặt vé</h2><div id="move"></div></div>
     <div class="card"><h2>🎫 Đặt vé &amp; khách sạn</h2><div id="links"></div></div>
     <div class="card" id="aiCard"><h2>✨ Gợi ý từ Claude</h2>
       <p class="muted">Lịch trình chi tiết hơn: giờ nên đi, khu vực ở, mẹo di chuyển, thời tiết.</p>
@@ -225,6 +236,6 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
   </div>
   </details>
 </div>
-<script src="app.js?v=22"></script>
+<script src="app.js?v=23"></script>
 </body>
 </html>
