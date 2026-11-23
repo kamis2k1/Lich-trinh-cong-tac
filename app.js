@@ -113,6 +113,50 @@ function setErr(msg,ids=[]){
 }
 const clean=s=>s.replace(/[\u0000-\u001f\u007f]/g,"").replace(/\s+/g," ").trim().slice(0,100);
 let busy=false;
+// ===== NAVITIME (RapidAPI, gói Basic miễn phí) =====
+const navKey=()=>{try{return localStorage.getItem("navKey")||""}catch{return MEM.navKey||""}};
+function setNavKey(v){try{v?localStorage.setItem("navKey",v):localStorage.removeItem("navKey")}catch{v?MEM.navKey=v:delete MEM.navKey}renderNav()}
+function renderNav(){const k=navKey();$("navState").innerHTML=k?'<span class="okb">Đã kết nối</span> Bấm "Tìm chuyến NAVITIME" trong mục Giờ tàu thật để xem các chuyến.':"Chưa kết nối. Khi kết nối, web tự tìm các chuyến tàu (tuyến, chỗ đổi tàu, giá vé) ngay trong trang.";$("navKey").value=k?"••••••••"+k.slice(-4):""}
+const MOVE={superexpress_train:"🚄",ultraexpress_train:"🚆",sleeper_ultraexpress:"🚆",express_train:"🚆",rapid_train:"🚃",local_train:"🚃",semiexpress_train:"🚃",domestic_flight:"✈️",shuttle_bus:"🚌",highway_bus:"🚌",local_bus:"🚌",ferry:"⛴️",walk:"🚶"};
+const tHM=s=>(s||"").slice(11,16);
+function navRoutes(j){
+  return (j.items||[]).map(it=>{const mv=(it.summary&&it.summary.move)||{},f=mv.fare||{},rf=mv.reference_fare||{};
+    const secs=(it.sections||[]).filter(x=>x.type==="move"&&x.move!=="walk");
+    return {dep:tHM(mv.from_time),arr:tHM(mv.to_time),time:mv.time||0,tr:mv.transit_count||0,
+      fare:rf.lowest_total_ic||rf.lowest_total_ticket||f.unit_48||f.unit_0||0,
+      parts:secs.map(x=>({ic:MOVE[x.move]||"🚃",name:(x.transport&&(x.transport.self_name||x.transport.name))||x.line_name||"",from:tHM(x.from_time),to:tHM(x.to_time)}))}}).filter(r=>r.dep&&r.arr);
+}
+async function navSearch(q){
+  const key="nav:"+JSON.stringify(q),hit=store.get(key);if(hit)return hit;
+  const p=new URLSearchParams({start:q.s.join(","),goal:q.g.join(","),limit:"5",datum:"wgs84",coord_unit:"degree",lang:"ja"});
+  p.set(q.mode==="arr"?"goal_time":"start_time",`${q.date}T${q.tm}:00`);
+  let r;try{r=await fetch("https://navitime-route-totalnavi.p.rapidapi.com/route_transit?"+p,{headers:{"X-RapidAPI-Key":navKey(),"X-RapidAPI-Host":"navitime-route-totalnavi.p.rapidapi.com"}})}catch(e){throw new Error("Không kết nối được NAVITIME. Kiểm tra mạng rồi thử lại.")}
+  if(r.status===401||r.status===403)throw new Error("Mã RapidAPI không đúng hoặc chưa đăng ký gói Basic của NAVITIME.");
+  if(r.status===429)throw new Error("Đã hết lượt tra NAVITIME (500 lượt/tháng) hoặc tra quá nhanh. Thử lại sau.");
+  if(!r.ok)throw new Error("NAVITIME báo lỗi ("+r.status+"). Thử lại sau.");
+  const rs=navRoutes(await r.json());store.set(key,rs);return rs;
+}
+document.addEventListener("click",async e=>{
+  const b=e.target.closest(".navbtn");if(b){
+    const box=b.closest(".leg"),out=box.querySelector(".nres"),q=JSON.parse(b.dataset.q);
+    b.disabled=true;const tx=b.textContent;b.textContent="Đang tìm chuyến…";out.innerHTML="";
+    try{const rs=await navSearch(q);
+      out.innerHTML=rs.length?rs.map((r,i)=>`<div class="nr"><div class="tt">${esc(r.dep)} → ${esc(r.arr)} <span class="muted">· ${fmtH(r.time/60)} · đổi ${r.tr} lần${r.fare?` · ¥${Number(r.fare).toLocaleString("ja-JP")}`:""}</span></div><div class="ln">${r.parts.map(x=>`${x.ic} ${esc(x.name)}${x.from?` ${esc(x.from)}`:""}`).join(" → ")}</div><button type="button" class="primary npick" data-i="${i}">Chọn chuyến này</button></div>`).join("")+`<p class="note">Giờ NAVITIME (bản miễn phí) tính theo thời gian chạy trung bình, có thể lệch vài phút. Chưa có xe buýt cao tốc. Đối chiếu Yahoo rồi chốt giờ thật nếu cần.</p>`
+        :'<p class="muted">NAVITIME không tìm thấy chuyến phù hợp.</p>';
+      out._rs=rs;
+    }catch(err){out.innerHTML=`<div class="err" role="alert">${esc(err.message)}</div>`}
+    finally{b.disabled=false;b.textContent=tx}
+    return}
+  const pk=e.target.closest(".npick");if(pk&&cur){
+    const box=pk.closest(".leg"),r=box.querySelector(".nres")._rs[+pk.dataset.i],data=store.get(realKey(cur))||{};
+    data[box.dataset.leg]={dep:r.dep,arr:r.arr,fare:r.fare||0,line:r.parts.map(x=>x.name).filter(Boolean).slice(0,4).join("→").slice(0,80),src:"navitime"};
+    store.set(realKey(cur),data);await build();return}
+  if(e.target.id==="navSave"){const v=$("navKey").value.trim();
+    if(v.startsWith("••"))return;
+    if(!/^[A-Za-z0-9_-]{20,80}$/.test(v)){$("navErr").textContent="Mã không đúng định dạng (chỉ gồm chữ và số, khoảng 50 ký tự).";return}
+    $("navErr").textContent="";setNavKey(v);$("navSetup").open=false;if(cur)build()}
+  if(e.target.id==="navDel"){setNavKey("");$("navErr").textContent="";if(cur)build()}
+});
 const realKey=c=>`real:${c.fromT.toLowerCase()}|${c.toT.toLowerCase()}|${c.d1}|${c.d2}`;
 function parseYahoo(t){
   t=(t||"").replace(/[０-９：，]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
@@ -254,9 +298,10 @@ async function build(){
   if(A&&B&&A[5]==="JP"&&B[5]==="JP"){
     const fj=jaName(A,fromT),tj=jaName(B,toT);
     const leg=(key,lbl,f,t,fJ,tJ,date,mode,tm)=>{const r=real[key];return `<div class="leg${r?" done":""}" data-leg="${key}"><div class="h">${lbl} · ${dmy(date)} · ${mode==="arr"?"đến trước":"khởi hành"} ${tm}</div>`+
-      (r?`<div class="realbox">✓ Giờ thật: <b>${esc(r.dep)} → ${esc(r.arr)}</b>${r.line?` · ${esc(r.line)}`:""}${r.fare?` · ¥${Number(r.fare).toLocaleString("ja-JP")}`:""}</div>`:"")+
+      (r?`<div class="realbox">${r.src==="navitime"?"≈ Giờ NAVITIME (trung bình)":"✓ Giờ thật"}: <b>${esc(r.dep)} → ${esc(r.arr)}</b>${r.line?` · ${esc(r.line)}`:""}${r.fare?` · ¥${Number(r.fare).toLocaleString("ja-JP")}`:""}</div>`:"")+
       `<div class="btns">${routeLinks(f,t,fJ,tJ,date,mode,tm,best0.t).map((l,k)=>`<a class="${k===0?"pri":""}" href="${l[1]}" target="_blank" rel="noopener">${l[0].replace("★ ","").replace(" (giờ tàu chính xác)","")}</a>`).join("")}</div>`+
-      `<details class="fix"${r?"":""}><summary>${r?"Sửa giờ thật":"✎ Chốt giờ thật từ Yahoo"}</summary>
+      (navKey()?`<button type="button" class="ghost navbtn" data-q="${esc(JSON.stringify({s:[f===fromT?A[2]:B[2],f===fromT?A[3]:B[3]],g:[f===fromT?B[2]:A[2],f===fromT?B[3]:A[3]],date,mode,tm}))}">🔎 Tìm chuyến NAVITIME</button><div class="nres"></div>`:"")+
+      `<details class="fix"><summary>${r?"Sửa giờ thật":"✎ Chốt giờ thật từ Yahoo"}</summary>
         <label class="lab">Dán kết quả từ Yahoo (tự nhận giờ và giá)<textarea class="rpaste" rows="2" placeholder="VD: 08:06発→13:34着 5時間28分 18,070円"></textarea></label>
         <div class="g2"><label class="lab">Giờ đi<input type="time" class="rdep" value="${r?esc(r.dep):""}"></label><label class="lab">Giờ đến<input type="time" class="rarr" value="${r?esc(r.arr):""}"></label></div>
         <div class="g2"><label class="lab">Giá vé (¥)<input type="text" inputmode="numeric" class="rfare" maxlength="7" value="${r&&r.fare?esc(String(r.fare)):""}"></label><label class="lab">Tuyến (tuỳ chọn)<input type="text" class="rline" maxlength="80" placeholder="みどり→のぞみ→バス" value="${r&&r.line?esc(r.line):""}"></label></div>
@@ -300,7 +345,7 @@ async function build(){
   // 2 hero
   const bt=best.t!=null;
   $("hero").innerHTML=`<div class="od">${esc(fromT)} → ${esc(toT)}</div><div class="sub">${dmy(d1)} – ${dmy(d2)} · ${nights?nights+" đêm":"trong ngày"} · ${pax} người</div>`+
-    (bt?`<div class="big"><span class="t">${go.dep.slice(0,5)}</span><div class="line"><span>${(IC[best.k]||"")} ${go.real?fmtH(((toMin(go.arr)-toMin(go.dep))%1440+1440)%1440/60):fmtH(best.t)}</span></div><span class="t">${go.arr.slice(0,5)}</span></div><div class="sub">${go.real?`<span class="okb">✓ Giờ thật</span> ${real.go.line?esc(real.go.line)+" · ":""}${real.go.fare?"¥"+Number(real.go.fare*pax).toLocaleString("ja-JP"):""}`:`Lượt đi bằng ${esc(best.n)} · ~${money(best.p*pax,best.ccy)} · giờ là ước tính, bấm "Chốt giờ thật" bên dưới`}</div>`:"");
+    (bt?`<div class="big"><span class="t">${go.dep.slice(0,5)}</span><div class="line"><span>${(IC[best.k]||"")} ${go.real?fmtH(((toMin(go.arr)-toMin(go.dep))%1440+1440)%1440/60):fmtH(best.t)}</span></div><span class="t">${go.arr.slice(0,5)}</span></div><div class="sub">${go.real?`<span class="okb">${real.go.src==="navitime"?"≈ NAVITIME":"✓ Giờ thật"}</span> ${real.go.line?esc(real.go.line)+" · ":""}${real.go.fare?"¥"+Number(real.go.fare*pax).toLocaleString("ja-JP"):""}`:`Lượt đi bằng ${esc(best.n)} · ~${money(best.p*pax,best.ccy)} · giờ là ước tính, bấm "Chốt giờ thật" bên dưới`}</div>`:"");
   $("ai").textContent="";$("msg").textContent="";
   $("out").classList.remove("hidden");$("out").scrollIntoView({behavior:"smooth"});
 }
@@ -313,7 +358,7 @@ function renderSaved(){const s=loadSaved();$("saved").innerHTML=s.length?s.map((
 $("save").onclick=()=>{const s=loadSaved();s.unshift({fromT:cur.fromT,toT:cur.toT,d1:cur.d1,d2:cur.d2,m1:cur.m1,t1:cur.t1,m2:cur.m2,t2:cur.t2,pax:cur.pax,pref:cur.pref,note:cur.note});try{localStorage.setItem("trips",JSON.stringify(s.slice(0,20)));$("msg").textContent="Đã lưu.";}catch{$("msg").textContent="Không lưu được trên trình duyệt này."}renderSaved()};
 $("saved").onclick=e=>{const s=loadSaved();if(e.target.dataset.i){const t=s[e.target.dataset.i];$("from").value=t.fromT;$("to").value=t.toT;$("d1").value=t.d1;$("d2").value=t.d2;if(t.t1){$("m1").value=t.m1;$("t1").value=t.t1;$("m2").value=t.m2;$("t2").value=t.t2}$("pax").value=t.pax;$("pref").value=t.pref;$("note").value=t.note||"";build()}
   if(e.target.dataset.del){s.splice(+e.target.dataset.del,1);try{localStorage.setItem("trips",JSON.stringify(s))}catch{}renderSaved()}};
-renderSaved();renderPlaces();
+renderSaved();renderPlaces();renderNav();
 
 let sample=null;$("aiCard").classList.add("hidden");
 (async()=>{try{if(window.claude&&claude.use){sample=await claude.use("sample");if(sample)$("aiCard").classList.remove("hidden")}}catch{}})();

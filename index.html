@@ -103,6 +103,14 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
 .saved .s b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .saved button{padding:6px 12px;min-height:34px;font-size:.82rem}
 .ai{white-space:pre-wrap}
+.steps{padding-left:20px;margin:8px 0}.steps li{margin:4px 0}.steps a{color:var(--accent)}
+.navbtn{width:100%;margin-top:8px}
+.nres{margin-top:8px}
+.nr{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:6px}
+.nr .tt{font-weight:700;font-size:1.05rem;font-variant-numeric:tabular-nums}
+.nr .ln{font-size:.85rem;color:var(--muted);margin:2px 0 6px;overflow-wrap:anywhere}
+.nr button{padding:6px 12px;min-height:36px;font-size:.85rem}
+.nb{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:1px 8px;font-size:.75rem;font-weight:700}
 .leg.done{border-color:var(--ok)}
 .realbox{background:var(--ok-soft);color:var(--ok);padding:8px 10px;border-radius:8px;margin-bottom:8px;font-size:.9rem;overflow-wrap:anywhere}
 .realbox b{font-variant-numeric:tabular-nums}
@@ -160,8 +168,18 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
       <div id="ai" class="ai" style="margin-top:12px"></div></div>
   </div>
 
+  <div class="card" id="navCard"><h2>⚙ Kết nối NAVITIME</h2>
+    <p class="muted" id="navState">Chưa kết nối. Khi kết nối, web tự tìm các chuyến tàu (tuyến, chỗ đổi tàu, giá vé) ngay trong trang.</p>
+    <details id="navSetup"><summary>Cách kết nối (miễn phí, 500 lượt tra/tháng)</summary>
+      <ol class="muted steps"><li>Mở <a href="https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-totalnavi/pricing" target="_blank" rel="noopener">trang NAVITIME trên RapidAPI</a>, đăng ký tài khoản, chọn gói <b>Basic ($0)</b>.</li>
+      <li>Vào tab <b>Endpoints</b>, copy mã <b>X-RapidAPI-Key</b>.</li><li>Dán mã vào ô dưới và bấm Lưu. Mã chỉ lưu trong trình duyệt của bạn.</li></ol>
+      <label class="lab">Mã X-RapidAPI-Key<input id="navKey" type="password" autocomplete="off" maxlength="80" placeholder="Dán mã ở đây"></label>
+      <div class="rerr err" id="navErr" role="alert"></div>
+      <div class="actions"><button type="button" class="primary" id="navSave">Lưu mã</button><button type="button" class="ghost" id="navDel">Xoá mã</button></div>
+    </details>
+  </div>
   <div class="card" id="savedCard"><h2>☆ Chuyến đã lưu</h2><ul id="saved" class="saved"><li class="muted">Chưa có chuyến nào.</li></ul></div>
 </div>
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

@@ -22,7 +22,7 @@ async function newPage(opt = {}) {
   const page = await ctx.newPage();
   page.geoCalls = 0; page.errors = [];
   page.on("pageerror", e => page.errors.push(e.message));
-  page.on("console", m => { if (m.type() === "error" && !/fonts|ERR_FAILED|net::/.test(m.text())) page.errors.push(m.text()); });
+  page.on("console", m => { if (m.type() === "error" && !/fonts|ERR_FAILED|net::|Failed to load resource/.test(m.text())) page.errors.push(m.text()); });
   await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   await page.route(/nominatim\.openstreetmap\.org/, async r => {
     page.geoCalls++;
@@ -249,6 +249,62 @@ await test("Tên tuyến chèn mã → hiện dạng chữ", async p => {
   await p.click('.leg[data-leg="go"] summary'); await p.fill('.leg[data-leg="go"] .rdep', "08:06"); await p.fill('.leg[data-leg="go"] .rarr', "13:34");
   await p.fill('.leg[data-leg="go"] .rline', '<img src=x onerror="window.__z=1">'); await p.click('.leg[data-leg="go"] .rsave'); await p.waitForSelector(".leg.done");
   ok(!(await p.evaluate(() => window.__z)), "mã đã chạy!");
+});
+
+// 10. NAVITIME (giả lập RapidAPI)
+const NAV_JSON = { items: [
+  { summary: { move: { from_time: "2026-11-30T08:06:00+09:00", to_time: "2026-11-30T13:12:00+09:00", time: 306, transit_count: 2, reference_fare: { lowest_total_ic: 16940 } } },
+    sections: [{ type: "point" }, { type: "move", move: "ultraexpress_train", from_time: "2026-11-30T08:06:00+09:00", to_time: "2026-11-30T09:50:00+09:00", transport: { name: "特急みどり" } },
+      { type: "point" }, { type: "move", move: "superexpress_train", from_time: "2026-11-30T10:15:00+09:00", to_time: "2026-11-30T11:41:00+09:00", transport: { name: "のぞみ" } },
+      { type: "point" }, { type: "move", move: "walk" }, { type: "move", move: "ultraexpress_train", from_time: "2026-11-30T11:50:00+09:00", to_time: "2026-11-30T13:12:00+09:00", line_name: "特急しおかぜ" }] },
+  { summary: { move: { from_time: "2026-11-30T07:18:00+09:00", to_time: "2026-11-30T12:40:00+09:00", time: 322, transit_count: 3, fare: { unit_0: 15000 } } }, sections: [] }] };
+async function navPage(status = 200) {
+  const p = await newPage(); p.navCalls = 0;
+  await p.route(/navitime-route-totalnavi/, async r => { p.navCalls++; p.lastNav = r.request().url(); p.lastKey = r.request().headers()["x-rapidapi-key"];
+    if (status !== 200) return r.fulfill({ status, headers: { "access-control-allow-origin": "*" }, body: "{}" });
+    await r.fulfill({ contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(NAV_JSON) }); });
+  return p;
+}
+const KEY = "abcdEFGH1234abcdEFGH1234abcdEFGH1234abcdEFGH12";
+async function connect(p) { await p.click("#navSetup summary"); await p.fill("#navKey", KEY); await p.click("#navSave"); }
+async function navTest(name, status, fn) {
+  let p; try { p = await navPage(status); await fn(p); if (p.errors.length) throw new Error("Lỗi JS: " + p.errors.join(" | ")); results.push([true, name]); }
+  catch (e) { results.push([false, name, e.message.split("\n")[0]]); } finally { if (p) await p.context().close(); }
+}
+await test("Mã RapidAPI sai định dạng → báo lỗi, không lưu", async p => {
+  await p.click("#navSetup summary"); await p.fill("#navKey", "abc 123"); await p.click("#navSave");
+  ok(/định dạng/.test(await p.textContent("#navErr")), "không báo lỗi"); ok(/Chưa kết nối/.test(await p.textContent("#navState")), "vẫn lưu");
+});
+await navTest("Kết nối NAVITIME → tìm chuyến → hiện tuyến, giờ, giá, gửi đúng tham số", 200, async p => {
+  await connect(p); ok(/Đã kết nối/.test(await p.textContent("#navState")), "chưa kết nối");
+  await search(p, { ...T, from: "Sasebo station", to: "Imabari station", m1: "arr", t1: "13:30" });
+  await p.click('.leg[data-leg="go"] .navbtn'); await p.waitForSelector('.leg[data-leg="go"] .nr');
+  const t = await p.textContent('.leg[data-leg="go"] .nres');
+  ok(/08:06 → 13:12/.test(t) && /16,940/.test(t) && /のぞみ/.test(t) && /đổi 2 lần/.test(t), t.slice(0, 200));
+  const u = new URL(p.lastNav); ok(u.searchParams.get("goal_time") === `${T.d1}T13:30:00` && u.searchParams.get("start").startsWith("33.16"), p.lastNav);
+  ok(p.lastKey === KEY, "không gửi mã");
+});
+await navTest("Chọn chuyến NAVITIME → lịch trình dùng giờ đó, ghi rõ là giờ NAVITIME", 200, async p => {
+  await connect(p); await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  await p.click('.leg[data-leg="go"] .navbtn'); await p.click('.leg[data-leg="go"] .npick[data-i="0"]'); await p.waitForSelector('.leg[data-leg="go"].done');
+  ok(/08:06\s*khởi hành.*lúc 13:12/.test(await p.textContent("#plan")), "lịch trình chưa cập nhật"); ok(/NAVITIME/.test(await p.textContent("#hero")), "thiếu nhãn NAVITIME");
+});
+await navTest("Tìm lại cùng chuyến → dùng kết quả đã lưu, không tốn lượt", 200, async p => {
+  await connect(p); await search(p, { ...T, from: "Sasebo station", to: "Imabari station" });
+  await p.click('.leg[data-leg="go"] .navbtn'); await p.waitForSelector(".nr"); await p.click('.leg[data-leg="go"] .navbtn'); await p.waitForSelector(".nr");
+  ok(p.navCalls === 1, "gọi " + p.navCalls + " lần");
+});
+await navTest("Mã bị từ chối (403) → báo mã sai", 403, async p => {
+  await connect(p); await search(p, { ...T, from: "Sasebo station", to: "Imabari station" }); await p.click('.leg[data-leg="go"] .navbtn');
+  await p.waitForSelector(".nres .err"); ok(/không đúng/.test(await p.textContent(".nres .err")), "sai thông báo");
+});
+await navTest("Hết lượt tra (429) → báo hết lượt", 429, async p => {
+  await connect(p); await search(p, { ...T, from: "Sasebo station", to: "Imabari station" }); await p.click('.leg[data-leg="go"] .navbtn');
+  await p.waitForSelector(".nres .err"); ok(/hết lượt/.test(await p.textContent(".nres .err")), "sai thông báo");
+});
+await navTest("Xoá mã → nút NAVITIME biến mất", 200, async p => {
+  await connect(p); await search(p, T); ok(await p.$(".navbtn"), "chưa có nút");
+  await p.click("#navSetup summary"); await p.click("#navDel"); await p.waitForFunction(() => !document.querySelector(".navbtn")); ok(/Chưa kết nối/.test(await p.textContent("#navState")), "chưa xoá");
 });
 
 await browser.close();
