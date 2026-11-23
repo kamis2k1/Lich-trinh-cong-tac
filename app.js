@@ -38,12 +38,15 @@ const todayStr=()=>iso(new Date());
 const validDate=s=>/^\d{4}-\d{2}-\d{2}$/.test(s)&&addDays(s,0)===s;
 const dayDiff=(a,b)=>{const [y1,m1,d1]=a.split("-").map(Number),[y2,m2,d2]=b.split("-").map(Number);return Math.round((Date.UTC(y2,m2-1,d2)-Date.UTC(y1,m1-1,d1))/864e5)};
 $("d1").value=addDays(todayStr(),7);$("d2").value=addDays(todayStr(),10);
+const isOW=()=>!!(document.querySelector('input[name=trip][value=ow]')||{}).checked;
+const setTrip=ow=>{const r=document.querySelector(`input[name=trip][value=${ow?"ow":"rt"}]`);if(r)r.checked=true;$("f").classList.toggle("ow",!!ow)};
+document.addEventListener("change",e=>{if(e.target.name==="trip"){setTrip(e.target.value==="ow");setErr("")}});
 $("d1").min=todayStr();$("d2").min=$("d1").value;
 $("d1").addEventListener("change",()=>{const v=$("d1").value;if(validDate(v)){$("d2").min=v;if($("d2").value&&$("d2").value<v)$("d2").value=v}});
 
 function km(a,b){const R=6371,r=Math.PI/180,dl=(b[2]-a[2])*r,dg=(b[3]-a[3])*r;
   const h=Math.sin(dl/2)**2+Math.cos(a[2]*r)*Math.cos(b[2]*r)*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
-const fmtH=h=>{const H=Math.floor(h),M=Math.round((h-H)*60/5)*5;return (H?H+" giờ ":"")+(M?M+" phút":"")||"dưới 15 phút"};
+const fmtH=h=>{const t=Math.round(h*60/5)*5,H=Math.floor(t/60),M=t%60;return (H?H+" giờ ":"")+(M?M+" phút":"")||"dưới 15 phút"};
 const JPY2VND=170; // tỉ giá ước tính
 let CUR="VND";
 const money=(n,ccy)=>{ // n tính theo ccy gốc, hiển thị theo CUR
@@ -158,7 +161,7 @@ document.addEventListener("click",async e=>{
     $("navErr").textContent="";setNavKey(v);$("navSetup").open=false;if(cur)build()}
   if(e.target.id==="navDel"){setNavKey("");$("navErr").textContent="";if(cur)build()}
 });
-const realKey=c=>`real:${c.fromT.toLowerCase()}|${c.toT.toLowerCase()}|${c.d1}|${c.d2}`;
+const realKey=c=>`real:${c.fromT.toLowerCase()}|${c.toT.toLowerCase()}|${c.d1}|${c.ow?"ow":c.d2}`;
 function parseYahoo(t){
   t=(t||"").replace(/[０-９：，]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
   const m=t.match(/(\d{1,2}:\d{2})\s*発?\s*[→～~\-－]+\s*(\d{1,2}:\d{2})/)||t.match(/(\d{1,2}:\d{2})[\s\S]*?(\d{1,2}:\d{2})/);
@@ -275,16 +278,16 @@ function transportOptions(A,B){
   return {opts,dist};
 }
 
-function bookingLinks(A,B,fromT,toT,d1,d2,pax,opts){
+function bookingLinks(A,B,fromT,toT,d1,d2,pax,opts){const ow=!d2;if(ow)d2=addDays(d1,1);
   const e=encodeURIComponent,fN=A?short(A):fromT,tN=B?short(B):toT,L=[];
   const has=k=>opts.some(o=>o.k===k);
   const fq=A&&A[1]&&B&&B[1]?`${A[1]} to ${B[1]}`:`${fN} to ${tN}`;
   const jpDest=B&&B[5]==="JP",jpAny=(A&&A[5]==="JP")||jpDest,vnAny=(A&&A[5]==="VN")||(B&&B[5]==="VN");
   if(has("fly")||!A||!B){
-    L.push(["Google Flights (so sánh giá)",`https://www.google.com/travel/flights?hl=vi&q=${e(`Flights from ${fq} on ${d1} through ${d2}`)}`]);
+    L.push(["Google Flights (so sánh giá)",`https://www.google.com/travel/flights?hl=vi&q=${e(ow?`One way flights from ${fq} on ${d1}`:`Flights from ${fq} on ${d1} through ${d2}`)}`]);
     if(A&&A[1]&&B&&B[1]){
       const sk=d=>d.slice(2).replace(/-/g,"");
-      L.push(["Skyscanner",`https://www.skyscanner.jp/transport/flights/${A[1].toLowerCase()}/${B[1].toLowerCase()}/${sk(d1)}/${sk(d2)}/?adultsv2=${pax}&cabinclass=economy`]);
+      L.push(["Skyscanner",`https://www.skyscanner.jp/transport/flights/${A[1].toLowerCase()}/${B[1].toLowerCase()}/${sk(d1)}/${ow?"":sk(d2)+"/"}?adultsv2=${pax}&cabinclass=economy`]);
     }
     if(jpAny){L.push(["ANA","https://www.ana.co.jp/"],["JAL","https://www.jal.co.jp/"]);
       if(!vnAny) L.push(["Peach","https://www.flypeach.com/"],["Skymark","https://www.skymark.co.jp/"]);}
@@ -313,7 +316,7 @@ async function build(){
   const m1=$("m1").value==="arr"?"arr":"dep",m2=$("m2").value==="arr"?"arr":"dep";
   const okT=t=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t);
   const t1=okT($("t1").value)?$("t1").value:"08:00",t2=okT($("t2").value)?$("t2").value:"17:00";
-  const fromT=clean($("from").value),toT=clean($("to").value),d1=$("d1").value,d2=$("d2").value,note=clean($("note").value+"").slice(0,300);
+  const ow=isOW(),fromT=clean($("from").value),toT=clean($("to").value),d1=$("d1").value,d2=ow?d1:$("d2").value,note=clean($("note").value+"").slice(0,300);
   const pref=["fast","cheap","comfort"].includes($("pref").value)?$("pref").value:"fast";
   const miss=[];if(!fromT)miss.push("from");if(!toT)miss.push("to");if(!d1)miss.push("d1");if(!d2)miss.push("d2");
   const NAME={from:"điểm đi",to:"điểm đến",d1:"ngày đi",d2:"ngày về"};
@@ -345,11 +348,11 @@ async function build(){
   const OK=["JP","VN"];
   if(!OK.includes(A[5])||!OK.includes(B[5]))return setErr("Hiện chỉ hỗ trợ địa điểm ở Nhật Bản và Việt Nam.",[!OK.includes(A[5])?"from":"to"]);
   if(A&&B)addPlaces(fromT,toT);
-  const nights=dayDiff(d1,d2);
+  const nights=ow?0:dayDiff(d1,d2);
   CUR=(A&&A[5]==="JP")||(!A&&B&&B[5]==="JP")?"JPY":"VND";
   const jpDest=B&&B[5]==="JP",intl=A&&B&&A[5]!==B[5];
-  cur={fromT,toT,A,B,d1,d2,pax,pref,note,nights,jpDest,intl,m1,t1,m2,t2};
-  store.set("last",{fromT,toT,d1,d2,pax,pref,note,m1,t1,m2,t2});
+  cur={fromT,toT,A,B,d1,d2,pax,pref,note,nights,jpDest,intl,m1,t1,m2,t2,ow};
+  store.set("last",{fromT,toT,d1,d2,pax,pref,note,m1,t1,m2,t2,ow});
 
   let opts,dist=null;
   if(A&&B){({opts,dist}=transportOptions(A,B))}
@@ -360,7 +363,7 @@ async function build(){
   const IC={fly:"✈️",train:"🚄",bus:"🚌",car:"🚗"};
   $("opts").innerHTML=(dist?`<p class="muted" style="margin:0">Đường chim bay ~${Math.round(dist)} km${intl?` · 1¥ ≈ ${JPY2VND}đ`:""}</p>`:"")+opts.map((o,i)=>`<div class="opt${i===0?" best":""}"><div class="ic">${IC[o.k]||"🧭"}</div><div><b>${o.n}${i===0?'<span class="tag">Phù hợp nhất</span>':''}</b><span class="muted">${o.d}</span></div><div class="r">${o.t!=null?`<b>${fmtH(o.t)}</b><div class="muted">~${money(o.p*pax,o.ccy)}${pax>1?` · ${pax} người`:''}</div>`:''}</div></div>`).join("");
 
-  const L=bookingLinks(A,B,fromT,toT,d1,d2,pax,opts);
+  const L=bookingLinks(A,B,fromT,toT,d1,ow?null:d2,pax,opts);
   const real=store.get(realKey(cur))||{};cur.real=real;
   let legHtml="";const best0=opts[0];
   if(A&&B&&A[5]==="JP"&&B[5]==="JP"){
@@ -368,7 +371,7 @@ async function build(){
     const leg=(key,lbl,f,t,fJ,tJ,date,mode,tm)=>{const r=real[key];const [yy,mm,dd]=date.split("-").map(Number);return `<div class="leg${r?" done":""}" data-leg="${key}"><div class="h">${lbl} · ${wd[new Date(yy,mm-1,dd).getDay()]}, ${dmy(date)} <small>(${mode==="arr"?"đến trước":"đi lúc"} ${tm})</small></div>`+
       (r?`<div class="realbox">${r.src==="navitime"?"≈ Giờ NAVITIME (trung bình)":"✓ Đã chọn"}: <b>${esc(r.dep)} → ${esc(r.arr)}</b>${r.line?` · ${esc(r.line)}`:""}${r.fare?` · ¥${Number(r.fare).toLocaleString("ja-JP")}`:""}${okSegs(r)?`<div class="chg">${esc(chgLine(r.segs))}</div>`:`<div class="chg muted">Muốn biết đổi tàu ở đâu, sân ga, cách đặt vé? Dán toàn bộ 1 tuyến Yahoo vào ô bên dưới, hoặc dùng nút 📥 trên trang Yahoo.</div>`}</div>`:"")+
       `<div class="btns">${routeLinks(f,t,fJ,tJ,date,mode,tm,best0.t).map((l,k)=>`<a class="${k===0?"pri":""}" href="${l[1]}" target="_blank" rel="noopener">${k===0?"Mở Yahoo xem chuyến ↗":l[0]}</a>`).join("")}</div>`+
-      `<div class="pick"><div class="lbl2">${r?"Đổi chuyến khác? Gõ lại giờ:":"Gõ giờ chuyến bạn chọn:"}</div>
+      `${r?`<details class="repick"><summary>Đổi chuyến khác</summary>`:""}<div class="pick"><div class="lbl2">${r?"Gõ lại giờ chuyến mới:":"Gõ giờ chuyến bạn chọn:"}</div>
         <div class="g3"><label class="lab">Giờ đi<input type="time" class="rdep" value="${r?esc(r.dep):""}"></label><label class="lab">Giờ đến<input type="time" class="rarr" value="${r?esc(r.arr):""}"></label><button type="button" class="primary rsave">Lưu</button></div>
         <div class="rerr err" role="alert"></div>
         <details class="fix"><summary>Thêm giá vé, tên tàu, hoặc dán kết quả Yahoo</summary>
@@ -376,9 +379,9 @@ async function build(){
           <div class="g2"><label class="lab">Giá vé (¥)<input type="text" inputmode="numeric" class="rfare" maxlength="7" value="${r&&r.fare?esc(String(r.fare)):""}"></label><label class="lab">Tên tàu (tuỳ chọn)<input type="text" class="rline" maxlength="80" placeholder="みどり→のぞみ→バス" value="${r&&r.line?esc(r.line):""}"></label></div>
         </details>
         ${r?'<button type="button" class="ghost rclear">Xoá giờ đã chọn</button>':""}
-      </div>`+
+      </div>${r?"</details>":""}`+
       (navKey()?`<button type="button" class="ghost navbtn" data-q="${esc(JSON.stringify({s:[f===fromT?A[2]:B[2],f===fromT?A[3]:B[3]],g:[f===fromT?B[2]:A[2],f===fromT?B[3]:A[3]],date,mode,tm}))}">🔎 Tìm chuyến NAVITIME</button>`:"")+`<div class="nres"></div></div>`};
-    legHtml=leg("go","🚩 Lượt đi",fromT,toT,fj,tj,d1,m1,t1)+leg("back","🏠 Lượt về",toT,fromT,tj,fj,d2,m2,t2);
+    legHtml=leg("go",ow?"➡️ Chuyến đi (một chiều)":"🚩 Lượt đi",fromT,toT,fj,tj,d1,m1,t1)+(ow?"":leg("back","🏠 Lượt về",toT,fromT,tj,fj,d2,m2,t2));
   }
   $("legs").innerHTML=legHtml;$("legCard").classList.toggle("hidden",!legHtml);
   // Nhật: ước tính chỉ là phụ (thu gọn); chặng khác: đây là bước 2
@@ -395,14 +398,15 @@ async function build(){
   const local=jpDest?"Đi lại trong thành phố bằng tàu điện, dùng thẻ IC (Suica/ICOCA) hoặc Mobile Suica":"Đặt xe công nghệ (Grab, Xanh SM) trước giờ hẹn 30 phút để tránh kẹt xe";
   const go=legTimes(m1,t1,best.t),back=legTimes(m2,t2,best.t);
   if(real.go)Object.assign(go,{dep:real.go.dep,arr:real.go.arr,real:true});
-  if(real.back)Object.assign(back,{dep:real.back.dep,arr:real.back.arr,real:true});
+  if(real.back&&!ow)Object.assign(back,{dep:real.back.dep,arr:real.back.arr,real:true});
   const est=go.real?"":best.t?" (giờ đến là ước tính)":"";
   const viaGo=real.go&&real.go.line?real.go.line:viaL,viaBack=real.back&&real.back.line?` (${real.back.line})`:"";
   const aGo=go.real?"lúc":"khoảng",aBack=back.real?"lúc":"khoảng";
   cur.go=go;cur.back=back;
   for(let i=0;i<=nights;i++){
     const ds=addDays(d1,i),[yy,mm,dd]=ds.split("-").map(Number),dt=new Date(yy,mm-1,dd);const label=`${wd[dt.getDay()]}, ${dmy(ds)}`;let items;
-    if(i===0&&nights===0) items=[`${go.dep} khởi hành từ ${fN} bằng ${viaGo}, đến ${tN} ${aGo} ${go.arr}${est}`,`Làm việc tại ${tN}`,`${back.dep} khởi hành về${viaBack}, đến ${fN} ${aBack} ${back.arr}`];
+    if(ow) items=[`${go.dep} khởi hành từ ${fN} bằng ${viaGo}, đến ${tN} ${aGo} ${go.arr}${est}`,`Đến ${tN}${jpDest?", dùng thẻ IC (Suica/ICOCA) đi lại trong thành phố":""}`,`Làm việc tại ${tN}`];
+    else if(i===0&&nights===0) items=[`${go.dep} khởi hành từ ${fN} bằng ${viaGo}, đến ${tN} ${aGo} ${go.arr}${est}`,`Làm việc tại ${tN}`,`${back.dep} khởi hành về${viaBack}, đến ${fN} ${aBack} ${back.arr}`];
     else if(i===0) items=[`${go.dep} khởi hành từ ${fN} bằng ${viaGo}, đến ${tN} ${aGo} ${go.arr}${go.real?" ✓":best.t?` (đi ~${fmtH(best.t)})`:""}`,
       intl?"Mang hộ chiếu, kiểm tra visa/điều kiện nhập cảnh, đổi tiền hoặc mang thẻ quốc tế":`Từ ${hub} về khách sạn, nhận phòng từ ${checkin}`,
       intl?`Từ sân bay về khách sạn, nhận phòng từ ${checkin}`:"Chuẩn bị tài liệu, xác nhận lịch hẹn ngày mai"];
@@ -412,50 +416,76 @@ async function build(){
     days.push({label,items});
   }
   const chgItem=r=>okSegs(r)&&r.segs.filter(g=>g.kind!=="walk").length>1?`Đổi tàu/xe: ${chgLine(r.segs)} (chi tiết ở mục Kế hoạch di chuyển)`:"";
-  {const a=chgItem(real.go);if(a)days[0].items.splice(1,0,a);const b=chgItem(real.back);if(b){const it=days[nights].items;it.push(b)}}
+  {const a=chgItem(real.go);if(a)days[0].items.splice(1,0,a);const b=ow?"":chgItem(real.back);if(b){const it=days[nights].items;it.push(b)}}
   if(note) days[Math.min(1,nights)].items.splice(1,0,"Ghi chú: "+note);
   cur.days=days;
   $("plan").innerHTML=days.map((d,i)=>`<div class="day"><h3>Ngày ${i+1} · ${d.label}</h3><ul class="tl">${d.items.map(x=>{const m=x.match(/^(\d\d:\d\d)\s+(.*)$/);return m?`<li class="tt"><span class="when">${m[1]}</span>${esc(m[2])}</li>`:`<li>${esc(x)}</li>`}).join("")}</ul></div>`).join("");
-  const nReal=(real.go?1:0)+(real.back?1:0),jpLeg=!!legHtml;
-  $("moveCard").classList.toggle("hidden",!jpLeg);$("move").innerHTML=jpLeg?moveHtml("go","🚩 Lượt đi",d1,fromT,toT)+moveHtml("back","🏠 Lượt về",d2,toT,fromT):"";
-  $("st1").className="done";$("st2").className=!jpLeg||nReal===2?"done":"on";$("st3").className=!jpLeg||nReal===2?"on":"";
+  const nReal=(real.go?1:0)+(real.back&&!ow?1:0),need=ow?1:2,jpLeg=!!legHtml;
+  $("moveCard").classList.toggle("hidden",!jpLeg);$("move").innerHTML=jpLeg?moveHtml("go",ow?"➡️ Chuyến đi":"🚩 Lượt đi",d1,fromT,toT)+(ow?"":moveHtml("back","🏠 Lượt về",d2,toT,fromT)):"";
+  $("st1").className="done";$("st2").className=!jpLeg||nReal===need?"done":"on";$("st3").className=!jpLeg||nReal===need?"on":"";
   // 2 hero
   const bt=best.t!=null;
-  $("hero").innerHTML=`<div class="od">${esc(fromT)} → ${esc(toT)}</div><div class="sub">${dmy(d1)} – ${dmy(d2)} · ${nights?nights+" đêm":"trong ngày"} · ${pax} người</div>`+
-    (bt?`<div class="big"><span class="t">${go.dep.slice(0,5)}</span><div class="line"><span>${(IC[best.k]||"")} ${go.real?fmtH(((toMin(go.arr)-toMin(go.dep))%1440+1440)%1440/60):fmtH(best.t)}</span></div><span class="t">${go.arr.slice(0,5)}</span></div><div class="sub">${go.real?`<span class="okb">${real.go.src==="navitime"?"≈ NAVITIME":"✓ Giờ thật"}</span> ${real.go.line?esc(real.go.line)+" · ":""}${real.go.fare?"¥"+Number(real.go.fare*pax).toLocaleString("ja-JP"):""}`:`Lượt đi bằng ${esc(best.n)} · ~${money(best.p*pax,best.ccy)} · giờ là ước tính, chọn giờ thật ở bước 2`}</div>`:"")+(jpLeg?`<div class="hstat${nReal===2?" ok":""}">${nReal===2?"✓ Đã chọn giờ tàu cả lượt đi và lượt về":nReal===1?"Còn 1 lượt chưa chọn giờ tàu (bước 2)":"Bước tiếp theo: chọn giờ tàu ở bước 2 bên dưới"}</div>`:"");
+  $("hero").innerHTML=`<div class="od">${esc(fromT)} → ${esc(toT)}</div><div class="sub">${ow?`${dmy(d1)} · một chiều`:`${dmy(d1)} – ${dmy(d2)} · khứ hồi · ${nights?nights+" đêm":"trong ngày"}`} · ${pax} người</div>`+
+    (bt?`<div class="big"><span class="t">${go.dep.slice(0,5)}</span><div class="line"><span>${(IC[best.k]||"")} ${go.real?fmtH(((toMin(go.arr)-toMin(go.dep))%1440+1440)%1440/60):fmtH(best.t)}</span></div><span class="t">${go.arr.slice(0,5)}</span></div><div class="sub">${go.real?`<span class="okb">${real.go.src==="navitime"?"≈ NAVITIME":"✓ Giờ thật"}</span> ${real.go.line?esc(real.go.line)+" · ":""}${real.go.fare?"¥"+Number(real.go.fare*pax).toLocaleString("ja-JP"):""}`:`Lượt đi bằng ${esc(best.n)} · ~${money(best.p*pax,best.ccy)} · giờ là ước tính, chọn giờ thật ở bước 2`}</div>`:"")+(jpLeg?`<div class="hstat${nReal===need?" ok":""}">${nReal===need?(ow?"✓ Đã chọn giờ tàu":"✓ Đã chọn giờ tàu cả lượt đi và lượt về"):nReal===1?"Còn 1 lượt chưa chọn giờ tàu (bước 2)":"Bước tiếp theo: chọn giờ tàu ở bước 2 bên dưới"}</div>`:"");
   $("ai").textContent="";$("msg").textContent="";
   $("out").classList.remove("hidden");
-  $("csumT").textContent=`${fromT} → ${toT}`;$("csumD").textContent=`${dmy(d1)} – ${dmy(d2)} · ${pax} người`;$("f").classList.add("compact");
+  $("csumT").textContent=`${fromT} → ${toT}`;$("csumD").textContent=`${ow?dmy(d1)+" · một chiều":dmy(d1)+" – "+dmy(d2)+" · khứ hồi"} · ${pax} người`;$("f").classList.add("compact");
   $("out").scrollIntoView({behavior:"smooth"});
 }
 const okSegs=r=>!!(r&&Array.isArray(r.segs)&&r.segs.length&&r.segs.every(g=>g&&typeof g.dep==="string"&&typeof g.line==="string"));
 // "07:18 佐世保 → [đổi] 博多 09:15 → 福山駅前 11:05 → 今治 12:34"
 function chgLine(segs){const v=segs.filter(g=>g.kind!=="walk");if(!v.length)return"";
   return [`${v[0].from} ${v[0].dep} ${segName(v[0])}`,...v.slice(1).map(g=>`đổi ở ${g.from} ${g.dep} ${segName(g)}`),`đến ${segs[segs.length-1].to} ${segs[segs.length-1].arr}`].join(" → ")}
+// Thông tin đổi tàu / chờ sau chặng k (đi bộ gộp vào)
+function afterSeg(segs,k){const mm=(a,b)=>((toMin(b)-toMin(a))%1440+1440)%1440,g=segs[k];let j=k+1,walk=null;
+  if(segs[j]&&segs[j].kind==="walk"){walk=segs[j];j++}
+  const nx=segs[j];
+  if(!nx){const last=segs[segs.length-1];return{ic:"🏁",txt:`Đến ${last.to} ${last.arr}${walk?` (đi bộ ~${mm(walk.dep,walk.arr)||1} phút)`:""}`,end:true}}
+  const w=mm(walk?walk.arr:g.arr,nx.dep);
+  if(walk)return{ic:"🚶",txt:`Đi bộ ~${mm(walk.dep,walk.arr)||1} phút sang ${nx.from}${nx.pf?` (${nx.pf})`:""}, chờ ${w} phút`};
+  return{ic:"🔁",txt:`Đổi tàu tại ${nx.from}, có ${mm(g.arr,nx.dep)} phút${g.pt&&nx.pf?`: sân ${g.pt} → ${nx.pf}`:nx.pf?`: sang ${nx.pf}`:""}`};
+}
 function moveHtml(key,lbl,date,f,t){const r=cur&&cur.real&&cur.real[key];
   const h=`<h3>${lbl} · ${dmy(date)}${r?` · <span class="t">${esc(r.dep)} → ${esc(r.arr)}</span>`:""}</h3>`;
   if(!r)return `<div class="mv">${h}<p class="muted">Chưa chọn chuyến. Chọn giờ tàu ở bước 2 để có kế hoạch chi tiết.</p></div>`;
   if(!okSegs(r))return `<div class="mv">${h}<p class="muted">Mới có giờ đi/đến${r.line?` (${esc(r.line)})`:""}. Để biết đổi tàu ở đâu, sân ga và cách đặt vé từng chặng: bấm nút 📥 trên trang Yahoo, hoặc copy toàn bộ 1 tuyến trên Yahoo rồi dán vào ô "Dán kết quả" ở bước 2.</p></div>`;
-  const segs=r.segs,v=segs.filter(g=>g.kind!=="walk"),steps=segSteps(segs),tip=jrTip(segs);
+  const segs=r.segs,v=segs.map((g,k)=>[g,k]).filter(([g])=>g.kind!=="walk"),tip=jrTip(segs),last=segs[segs.length-1];
+  // dải tuyến nằm ngang: ga — tàu — ga
+  const nodes=[],mm=(a,b)=>((toMin(b)-toMin(a))%1440+1440)%1440;
+  v.forEach(([g,k],i)=>{
+    if(i===0)nodes.push(`<div class="nd"><b>${esc(g.dep)}</b><span>${esc(g.from)}</span></div>`);
+    nodes.push(`<div class="lk k-${esc(g.kind)}"><span>${SEG_IC[g.kind]||"🚃"} ${esc(segName(g))}</span></div>`);
+    const nx=v[i+1];
+    if(nx){const wk=segs[k+1]&&segs[k+1].kind==="walk";
+      nodes.push(`<div class="nd chg"><b>${esc(g.arr)}</b><span>${esc(g.to)}</span>${wk?`<i>🚶 ${mm(segs[k+1].dep,segs[k+1].arr)||1}′</i>`:""}<b class="d">${esc(nx[0].dep)}</b>${wk?`<span>${esc(nx[0].from)}</span>`:""}</div>`)}
+    else nodes.push(`<div class="nd end"><b>${esc(last.arr)}</b><span>${esc(last.to)}</span></div>`);
+  });
+  const rows=v.map(([g,k])=>{const b=bookingFor(g),fr=g.fares.find(x=>x.k),af=afterSeg(segs,k);
+    return `<div class="sg"><div class="c-n">${SEG_IC[g.kind]||"🚃"} <b>${esc(segName(g))}</b>${g.dest?`<small>đi ${esc(g.dest.replace(/行$/,""))}</small>`:""}</div>
+      <div class="c-d"><span class="lbm">Lên</span><b>${esc(g.dep)}</b> ${esc(g.from)}${g.pf?` <span class="pf">${esc(g.pf)}</span>`:""}</div>
+      <div class="c-a"><span class="lbm">Xuống</span><b>${esc(g.arr)}</b> ${esc(g.to)}${g.pt?` <span class="pf">${esc(g.pt)}</span>`:""}</div>
+      <div class="c-c${af.end?" end":""}">${af.ic} ${esc(af.txt)}</div>
+      <div class="c-b"><span class="need${/Không/.test(b.need)?" no":""}">${esc(b.need)}</span>${fr?` <small>${esc(fr.k)} ¥${Number(fr.v).toLocaleString("ja-JP")}</small>`:""}
+        ${b.links.length?`<div class="bkl">${b.links.map(l=>`<a href="${esc(l[1])}" target="_blank" rel="noopener">${esc(l[0])} ↗</a>`).join("")}</div>`:""}
+        <details class="how"><summary>Cách đặt</summary>${esc(b.how)}</details></div></div>`}).join("");
   return `<div class="mv">${h}<div class="sub muted">${esc(f)} → ${esc(t)} · đổi ${Math.max(0,v.length-1)} lần${r.fare?` · ¥${Number(r.fare).toLocaleString("ja-JP")}/người`:""}</div>
-    <ul class="tl">${steps.map(x=>`<li class="${x.t?"tt":""}${x.chg?" chgli":""}">${x.t?`<span class="when">${esc(x.t)}</span>`:""}${x.ic} ${esc(x.txt)}</li>`).join("")}<li class="tt"><span class="when">${esc(segs[segs.length-1].arr)}</span>🏁 Đến ${esc(segs[segs.length-1].to)}</li></ul>
-    <h4>🎫 Cách đặt vé lượt này</h4>${tip?`<p class="tip">💡 ${esc(tip)}</p>`:""}
-    ${v.map(g=>{const b=bookingFor(g),fr=g.fares.find(x=>x.k);return `<div class="bk"><div class="bkh">${SEG_IC[g.kind]||"🚃"} <b>${esc(segName(g))}</b> <span class="muted">${esc(g.from)} ${esc(g.dep)} → ${esc(g.to)} ${esc(g.arr)}</span> <span class="need${/Không/.test(b.need)?" no":""}">${esc(b.need)}</span></div>
-      <div class="bkb">${esc(b.how)}${fr?` <span class="muted">(${esc(fr.k)} ¥${Number(fr.v).toLocaleString("ja-JP")})</span>`:""}</div>${b.links.length?`<div class="bkl">${b.links.map(l=>`<a href="${esc(l[1])}" target="_blank" rel="noopener">${esc(l[0])} ↗</a>`).join("")}</div>`:""}</div>`}).join("")}</div>`}
+    <div class="strip" role="list">${nodes.join("")}</div>
+    <div class="segt"><div class="sg hd"><div>Tàu / xe</div><div>Lên</div><div>Xuống</div><div>Sau đó</div><div>Đặt vé</div></div>${rows}</div>
+    ${tip?`<p class="tip">💡 ${esc(tip)}</p>`:""}</div>`}
 function moveText(){if(!cur||!cur.real)return"";let o="";
-  for(const [k,l] of [["go","Lượt đi"],["back","Lượt về"]]){const r=cur.real[k];if(!okSegs(r))continue;
+  for(const [k,l] of cur.ow?[["go","Chuyến đi"]]:[["go","Lượt đi"],["back","Lượt về"]]){const r=cur.real[k];if(!okSegs(r))continue;
     o+=`\n\n=== Kế hoạch di chuyển ${l} (${r.dep} → ${r.arr}) ===\n`+segSteps(r.segs).map(x=>`${x.t||"     "} ${x.txt}`).join("\n")+`\n${r.segs[r.segs.length-1].arr} Đến ${r.segs[r.segs.length-1].to}\n\nCách đặt vé:\n`;
     const tip=jrTip(r.segs);if(tip)o+=`* ${tip}\n`;
     o+=r.segs.filter(g=>g.kind!=="walk").map(g=>{const b=bookingFor(g);return `- ${segName(g)} (${g.from} ${g.dep} → ${g.to} ${g.arr}): ${b.need}. ${b.how}${b.links.length?" "+b.links.map(x=>x[1]).join(" "):""}`}).join("\n")}
   return o}
 function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
-function asText(){if(!cur)return"";return `Lịch trình công tác ${cur.fromT} → ${cur.toT} (${dmy(cur.d1)} - ${dmy(cur.d2)})\nPhương tiện: ${cur.opts[0].n}\nLượt đi: ${cur.go.dep} → ${cur.go.arr}${cur.go.real?" (giờ thật)":" (ước tính)"}\nLượt về: ${cur.back.dep} → ${cur.back.arr}${cur.back.real?" (giờ thật)":" (ước tính)"}\n\n`+cur.days.map((d,i)=>`Ngày ${i+1} (${d.label})\n`+d.items.map(x=>"- "+x).join("\n")).join("\n\n")+moveText()+($("ai").textContent?"\n\nGợi ý chi tiết:\n"+$("ai").textContent:"")}
+function asText(){if(!cur)return"";return `Lịch trình công tác ${cur.fromT} → ${cur.toT} (${cur.ow?dmy(cur.d1)+", một chiều":dmy(cur.d1)+" - "+dmy(cur.d2)+", khứ hồi"})\nPhương tiện: ${cur.opts[0].n}\nLượt đi: ${cur.go.dep} → ${cur.go.arr}${cur.go.real?" (giờ thật)":" (ước tính)"}\n${cur.ow?"":`Lượt về: ${cur.back.dep} → ${cur.back.arr}${cur.back.real?" (giờ thật)":" (ước tính)"}\n`}\n`+cur.days.map((d,i)=>`Ngày ${i+1} (${d.label})\n`+d.items.map(x=>"- "+x).join("\n")).join("\n\n")+moveText()+($("ai").textContent?"\n\nGợi ý chi tiết:\n"+$("ai").textContent:"")}
 $("copy").onclick=async()=>{try{await navigator.clipboard.writeText(asText());$("msg").textContent="Đã sao chép."}catch{$("msg").textContent="Trình duyệt chặn sao chép, hãy bôi đen để copy."}};
 
 function loadSaved(){try{return JSON.parse(localStorage.getItem("trips")||"[]")}catch{return[]}}
-function renderSaved(){const s=loadSaved();$("saved").innerHTML=s.length?s.map((t,i)=>`<li><div class="s"><b>${esc(t.fromT)} → ${esc(t.toT)}</b><span class="muted">${dmy(t.d1)} – ${dmy(t.d2)}</span></div><button class="ghost" data-i="${i}">Mở</button><button class="ghost" data-del="${i}" aria-label="Xoá">✕</button></li>`).join(""):'<li class="muted">Chưa có chuyến nào.</li>'}
-$("save").onclick=()=>{const s=loadSaved();s.unshift({fromT:cur.fromT,toT:cur.toT,d1:cur.d1,d2:cur.d2,m1:cur.m1,t1:cur.t1,m2:cur.m2,t2:cur.t2,pax:cur.pax,pref:cur.pref,note:cur.note});try{localStorage.setItem("trips",JSON.stringify(s.slice(0,20)));$("msg").textContent="Đã lưu.";}catch{$("msg").textContent="Không lưu được trên trình duyệt này."}renderSaved()};
-$("saved").onclick=e=>{const s=loadSaved();if(e.target.dataset.i){const t=s[e.target.dataset.i];$("from").value=t.fromT;$("to").value=t.toT;$("d1").value=t.d1;$("d2").value=t.d2;if(t.t1){$("m1").value=t.m1;$("t1").value=t.t1;$("m2").value=t.m2;$("t2").value=t.t2}$("pax").value=t.pax;$("pref").value=t.pref;$("note").value=t.note||"";build()}
+function renderSaved(){const s=loadSaved();$("saved").innerHTML=s.length?s.map((t,i)=>`<li><div class="s"><b>${esc(t.fromT)} → ${esc(t.toT)}</b><span class="muted">${t.ow?dmy(t.d1)+" · một chiều":dmy(t.d1)+" – "+dmy(t.d2)}</span></div><button class="ghost" data-i="${i}">Mở</button><button class="ghost" data-del="${i}" aria-label="Xoá">✕</button></li>`).join(""):'<li class="muted">Chưa có chuyến nào.</li>'}
+$("save").onclick=()=>{const s=loadSaved();s.unshift({fromT:cur.fromT,toT:cur.toT,d1:cur.d1,d2:cur.d2,m1:cur.m1,t1:cur.t1,m2:cur.m2,t2:cur.t2,pax:cur.pax,pref:cur.pref,note:cur.note,ow:!!cur.ow});try{localStorage.setItem("trips",JSON.stringify(s.slice(0,20)));$("msg").textContent="Đã lưu.";}catch{$("msg").textContent="Không lưu được trên trình duyệt này."}renderSaved()};
+$("saved").onclick=e=>{const s=loadSaved();if(e.target.dataset.i){const t=s[e.target.dataset.i];$("from").value=t.fromT;$("to").value=t.toT;$("d1").value=t.d1;$("d2").value=t.d2;if(t.t1){$("m1").value=t.m1;$("t1").value=t.t1;$("m2").value=t.m2;$("t2").value=t.t2}$("pax").value=t.pax;$("pref").value=t.pref;$("note").value=t.note||"";setTrip(t.ow);build()}
   if(e.target.dataset.del){s.splice(+e.target.dataset.del,1);try{localStorage.setItem("trips",JSON.stringify(s))}catch{}renderSaved()}};
 renderSaved();renderPlaces();renderNav();
 // ===== Nhận chuyến gửi từ trang Yahoo (nút bookmark) =====
@@ -471,13 +501,13 @@ async function receiveYahoo(){
   const routes=y.r.slice(0,6).map(t=>parseYahoo(String(t).slice(0,4000))).filter(r=>r.dep&&r.arr);
   const L=store.get("last");
   if(!L)return setErr("Hãy lập lịch trình trên web trước, rồi mới gửi chuyến từ Yahoo về.");
-  $("from").value=L.fromT;$("to").value=L.toT;$("d1").value=L.d1;$("d2").value=L.d2;$("pax").value=L.pax;$("pref").value=L.pref;$("note").value=L.note||"";$("m1").value=L.m1;$("t1").value=L.t1;$("m2").value=L.m2;$("t2").value=L.t2;
+  $("from").value=L.fromT;$("to").value=L.toT;$("d1").value=L.d1;$("d2").value=L.d2;$("pax").value=L.pax;$("pref").value=L.pref;$("note").value=L.note||"";$("m1").value=L.m1;$("t1").value=L.t1;$("m2").value=L.m2;$("t2").value=L.t2;setTrip(L.ow);
   await build();if(!cur)return;
   const n=x=>(x||"").replace(/(駅|市|町|村)$/,"");
-  let leg=y.d===cur.d2&&y.d!==cur.d1?"back":y.d===cur.d1&&y.d!==cur.d2?"go":"";
+  let leg=cur.ow?(y.d===cur.d1?"go":""):y.d===cur.d2&&y.d!==cur.d1?"back":y.d===cur.d1&&y.d!==cur.d2?"go":"";
   if(!leg&&y.d===cur.d1){const fj=document.querySelector('.leg[data-leg="back"] .btns a');leg=fj&&n(new URL(fj.href).searchParams.get("from"))===n(y.f)?"back":"go"}
   const box=document.querySelector(`.leg[data-leg="${leg}"]`);
-  if(!box)return setErr(`Chuyến Yahoo ngày ${dmy(y.d)} không khớp ngày đi (${dmy(cur.d1)}) hay ngày về (${dmy(cur.d2)}) của lịch trình.`);
+  if(!box)return setErr(`Chuyến Yahoo ngày ${dmy(y.d)} không khớp ${cur.ow?`ngày đi (${dmy(cur.d1)})`:`ngày đi (${dmy(cur.d1)}) hay ngày về (${dmy(cur.d2)})`} của lịch trình.`);
   const out=box.querySelector(".nres")||box.insertBefore(Object.assign(document.createElement("div"),{className:"nres"}),box.querySelector(".fix"));
   out._rs=routes.map(r=>({...r,parts:[],yahoo:true}));
   out.innerHTML=`<div class="realbox">📥 Nhận ${routes.length} chuyến từ Yahoo (${esc(y.f)} → ${esc(y.t)}, ${dmy(y.d)}). Chọn chuyến bạn sẽ đi:</div>`+
@@ -497,7 +527,7 @@ $("aiBtn").onclick=async()=>{
   if(!sample||!cur)return;const btn=$("aiBtn");btn.disabled=true;$("ai").textContent="Đang soạn...";
   const where=cur.intl?"giữa Nhật Bản và Việt Nam":cur.jpDest?"ở Nhật Bản":"ở Việt Nam";
   const prompt=`Bạn là trợ lý lập kế hoạch đi công tác ${where}. Người dùng là người Việt đang sống ở Nhật. Viết bằng tiếng Việt, ngắn gọn, gạch đầu dòng theo từng ngày, không dùng markdown đậm/nghiêng. Khi nhắc tên ga, địa danh Nhật thì ghi kèm chữ Nhật.
-Chuyến đi: từ ${cur.fromT} đến ${cur.toT}, đi ngày ${dmy(cur.d1)}, về ngày ${dmy(cur.d2)} (${cur.nights} đêm), ${cur.pax} người, ưu tiên: ${({fast:"nhanh",cheap:"tiết kiệm",comfort:"thoải mái"})[cur.pref]}.
+Chuyến đi: từ ${cur.fromT} đến ${cur.toT}, ${cur.ow?`đi một chiều ngày ${dmy(cur.d1)}`:`đi ngày ${dmy(cur.d1)}, về ngày ${dmy(cur.d2)} (${cur.nights} đêm)`}, ${cur.pax} người, ưu tiên: ${({fast:"nhanh",cheap:"tiết kiệm",comfort:"thoải mái"})[cur.pref]}.
 Phương tiện đề xuất: ${cur.opts.map(o=>o.n).join(", ")}.
 Ghi chú công việc: ${cur.note||"không có"}.
 Hãy gợi ý: khung giờ khởi hành nên chọn, khu vực nên ở gần nơi làm việc, cách di chuyển từ sân bay/ga vào trung tâm và chi phí ước tính (tính bằng ${CUR==="JPY"?"yên":"đồng"}), lịch trình từng ngày, lưu ý thời tiết theo mùa${cur.intl?", giấy tờ nhập cảnh":""}, và danh sách đồ cần mang. Nói rõ giá chỉ là ước tính.`;

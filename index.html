@@ -50,7 +50,7 @@ button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:10px 14px
 .chip{flex:none;padding:5px 12px;min-height:32px;font-size:.82rem;font-weight:500;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
 .g2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-top:12px}.g2>div{min-width:0}
 input[type=date],input[type=time]{min-width:0;max-width:100%;-webkit-appearance:none;appearance:none}
-.tm{display:flex;gap:6px}.tm select{flex:1.25;padding-left:8px;padding-right:4px}.tm input{flex:1;padding-left:8px;padding-right:4px}
+.tm{display:flex;gap:6px}.tm input{min-width:118px}.tm select{flex:1.25;padding-left:8px;padding-right:4px}.tm input{flex:1;padding-left:8px;padding-right:4px}
 @media (max-width:480px){.g2.t{grid-template-columns:1fr}}
 details{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
 summary{cursor:pointer;font-weight:600;color:var(--accent);font-size:.9rem;list-style:none}
@@ -146,6 +146,7 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
 .g3 .lab{margin-top:4px}
 .g3 .rsave{min-height:44px;padding:0 18px}
 .rclear{margin-top:8px}
+.repick{margin-top:8px}
 .leg .h small{font-weight:500;color:var(--muted)}
 .hstat{margin-top:10px;padding:8px 12px;border-radius:10px;font-weight:600;font-size:.9rem;background:#fff4e5;color:#8a4b00}
 .hstat.ok{background:var(--ok-soft);color:var(--ok)}
@@ -157,6 +158,65 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
 .csum{display:none;align-items:center;gap:10px;justify-content:space-between}
 #f.compact .csum{display:flex}
 .csum b{overflow-wrap:anywhere}
+
+/* Một chiều / khứ hồi */
+.seg{display:inline-flex;background:var(--accent-soft);border-radius:99px;padding:3px;margin-bottom:10px}
+.seg label{position:relative;margin:0;text-transform:none;letter-spacing:0;font-size:.9rem;color:var(--accent);cursor:pointer}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg span{display:block;padding:7px 16px;border-radius:99px;font-weight:600}
+.seg input:checked+span{background:var(--accent);color:#fff}
+@media (prefers-color-scheme:dark){.seg input:checked+span{color:#0f1318}}
+.seg input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+#f.ow .rt-only{display:none}
+#f.ow .g2 .rt-only{display:none}
+/* Kế hoạch di chuyển: dải tuyến ngang + bảng chặng */
+.strip{display:flex;align-items:stretch;overflow-x:auto;gap:0;padding:10px 2px 12px;scrollbar-width:thin}
+.nd{flex:none;display:flex;flex-direction:column;align-items:center;text-align:center;min-width:76px;max-width:130px;padding:6px 6px;border:2px solid var(--accent);border-radius:12px;background:var(--card);font-size:.8rem;line-height:1.25}
+.nd b{font-size:.95rem;font-variant-numeric:tabular-nums}.nd b.d{color:var(--accent)}
+.nd span{overflow-wrap:anywhere}.nd i{font-style:normal;color:var(--muted);font-size:.75rem;margin:2px 0}
+.nd.chg{border-style:dashed}.nd.end{background:var(--accent);color:#fff;border-color:var(--accent)}
+@media (prefers-color-scheme:dark){.nd.end{color:#0f1318}}
+.lk{flex:1 0 90px;display:flex;align-items:center;justify-content:center;position:relative;padding:0 4px;min-width:90px}
+.lk:before{content:"";position:absolute;left:0;right:0;top:50%;border-top:3px solid var(--accent)}
+.lk.k-hbus:before,.lk.k-bus:before{border-top-color:#e37400}.lk.k-shin:before{border-top-color:#1e8e3e}
+.lk span{position:relative;background:var(--card);padding:2px 8px;border-radius:99px;border:1px solid var(--line);font-size:.78rem;font-weight:600;white-space:nowrap}
+.segt{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.sg{display:grid;grid-template-columns:1.25fr 1fr 1fr 1.2fr 1.5fr;gap:10px;padding:10px 12px;border-top:1px solid var(--line);font-size:.86rem;align-items:start}
+.sg>div{min-width:0;overflow-wrap:anywhere}
+.sg.hd{border-top:0;background:var(--accent-soft);font-weight:700;font-size:.75rem;text-transform:uppercase;color:var(--accent)}
+.sg small{display:block;color:var(--muted)}.c-b small{display:inline}
+.sg b{font-variant-numeric:tabular-nums}
+.pf{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:0 6px;font-size:.76rem;font-weight:700}
+.c-c{color:var(--muted)}.c-c.end{color:var(--ok);font-weight:600}
+.lbm{display:none}
+.how{margin-top:6px;border:0;padding:0;font-size:.82rem}.how summary{font-size:.8rem}
+.c-b .bkl{margin-top:4px}.c-b .bkl a{padding:5px 8px;font-size:.78rem}
+.mv .tip{margin-top:8px}
+@media (max-width:760px){
+  .sg.hd{display:none}
+  .sg{grid-template-columns:1fr 1fr;gap:6px 10px}
+  .c-n,.c-c,.c-b{grid-column:1/-1}.c-n{font-size:.95rem}
+  .lbm{display:block;font-size:.7rem;color:var(--muted);text-transform:uppercase;font-weight:700}
+  .c-c{background:var(--bg);border-radius:8px;padding:6px 8px}
+}
+/* Lịch trình theo ngày xếp ngang */
+#plan{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+#plan .day{border:1px solid var(--line);border-radius:12px;padding:12px;margin:0}
+/* Màn hình rộng: 2 cột */
+@media (min-width:980px){
+  .wrap{max-width:1180px}
+  .fgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+  .fr>.g2:first-child{margin-top:0}
+  #out{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start}
+  #out>.card{margin:0}
+  #hero,#legCard,#planCard,#moveCard,#aiCard,#linksCard,#optCard{grid-column:1/-1}
+  #out{margin-bottom:12px}
+  #links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}#links .grp{margin:0}
+  #legs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  #legs .leg{margin-top:8px}
+  #legs .leg:only-child{grid-column:1/-1;max-width:640px}
+  #moveCard .mv+.mv{border-top:1px solid var(--line)}
+}
 .sub-card{border-top:1px solid var(--line);margin-top:14px;padding-top:12px}
 </style>
 </head>
@@ -170,18 +230,21 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
   <form id="f" class="card" autocomplete="off" novalidate>
     <h2 class="sh"><span class="num">1</span> Nhập chuyến đi</h2>
     <div class="csum"><div><b id="csumT"></b><div class="muted" id="csumD"></div></div><button type="button" class="ghost" id="editTrip">✎ Sửa</button></div>
+    <div class="fgrid"><div class="fl">
+    <div class="seg" role="radiogroup" aria-label="Loại vé"><label><input type="radio" name="trip" value="rt" checked><span>⇄ Khứ hồi</span></label><label><input type="radio" name="trip" value="ow"><span>→ Một chiều</span></label></div>
     <div class="route">
       <div class="f"><span class="dot"></span><div><label for="from">Điểm đi</label><input id="from" list="cities" required maxlength="100" enterkeyhint="next" autocapitalize="words" placeholder="Ga, thành phố… (VD: Sasebo)"><div class="chips" id="fromRecent"></div></div></div>
       <div class="f"><span class="dot"></span><div><label for="to">Điểm đến</label><input id="to" list="cities" required maxlength="100" enterkeyhint="search" autocapitalize="words" placeholder="VD: Imabari station, Osaka"><div class="chips" id="toRecent"></div></div></div>
       <button type="button" id="swap" title="Đổi chiều đi/đến" aria-label="Đổi chiều đi và đến">⇅</button>
     </div>
+    </div><div class="fr">
     <div class="g2">
       <div><label for="d1">Ngày đi</label><input id="d1" type="date" required></div>
-      <div><label for="d2">Ngày về</label><input id="d2" type="date" required></div>
+      <div class="rt-only"><label for="d2">Ngày về</label><input id="d2" type="date" required></div>
     </div>
     <div class="g2 t">
       <div><label for="t1">Giờ lượt đi</label><div class="tm"><select id="m1" aria-label="Kiểu giờ lượt đi"><option value="dep">Khởi hành lúc</option><option value="arr">Đến nơi trước</option></select><input id="t1" type="time" value="08:00"></div></div>
-      <div><label for="t2">Giờ lượt về</label><div class="tm"><select id="m2" aria-label="Kiểu giờ lượt về"><option value="dep">Khởi hành lúc</option><option value="arr">Về đến trước</option></select><input id="t2" type="time" value="17:00"></div></div>
+      <div class="rt-only"><label for="t2">Giờ lượt về</label><div class="tm"><select id="m2" aria-label="Kiểu giờ lượt về"><option value="dep">Khởi hành lúc</option><option value="arr">Về đến trước</option></select><input id="t2" type="time" value="17:00"></div></div>
     </div>
     <details id="more">
       <summary>Tuỳ chọn thêm</summary>
@@ -191,6 +254,7 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
       </div>
       <div style="margin-top:10px"><label for="note">Công việc / ghi chú</label><textarea id="note" maxlength="300" placeholder="VD: Họp khách hàng 10h sáng ngày 2 gần ga, cần khách sạn gần ga"></textarea></div>
     </details>
+    </div></div>
     <div id="err" class="err" role="alert" aria-live="assertive"></div>
     <button class="primary go" type="submit">Tiếp tục ➜</button>
     <datalist id="cities"></datalist>
@@ -201,12 +265,12 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
     <div class="card" id="legCard"><h2 class="sh"><span class="num">2</span> Chọn giờ tàu</h2>
       <p class="guide">Với mỗi lượt: bấm <b>Mở Yahoo</b> xem các chuyến → chọn chuyến bạn thích → gõ <b>giờ đi</b>, <b>giờ đến</b> vào đây → bấm <b>Lưu</b>.</p>
       <div id="legs"></div></div>
-    <div class="card" id="optCard"><details id="optWrap" open><summary id="optSum">🚆 Phương tiện gợi ý</summary><div id="opts"></div>
-      <p class="note">Thời gian và giá ở đây là ước tính theo khoảng cách.</p></details></div>
-    <div class="card"><h2 class="sh"><span class="num">3</span> Lịch trình của bạn</h2><div id="plan"></div>
+    <div class="card" id="planCard"><h2 class="sh"><span class="num">3</span> Lịch trình của bạn</h2><div id="plan"></div>
       <div class="actions"><button class="primary" type="button" id="save">☆ Lưu chuyến</button><button class="ghost" type="button" id="copy">Sao chép</button><span id="msg" class="muted"></span></div></div>
     <div class="card hidden" id="moveCard"><h2>🧭 Kế hoạch di chuyển &amp; cách đặt vé</h2><div id="move"></div></div>
-    <div class="card"><h2>🎫 Đặt vé &amp; khách sạn</h2><div id="links"></div></div>
+    <div class="card" id="linksCard"><h2>🎫 Đặt vé &amp; khách sạn</h2><div id="links"></div></div>
+    <div class="card" id="optCard"><details id="optWrap" open><summary id="optSum">🚆 Phương tiện gợi ý</summary><div id="opts"></div>
+      <p class="note">Thời gian và giá ở đây là ước tính theo khoảng cách.</p></details></div>
     <div class="card" id="aiCard"><h2>✨ Gợi ý từ Claude</h2>
       <p class="muted">Lịch trình chi tiết hơn: giờ nên đi, khu vực ở, mẹo di chuyển, thời tiết.</p>
       <div class="actions"><button class="primary" type="button" id="aiBtn">Nhờ Claude gợi ý</button></div>
@@ -236,6 +300,6 @@ summary:before{content:"＋ "}details[open] summary:before{content:"－ "}
   </div>
   </details>
 </div>
-<script src="app.js?v=23"></script>
+<script src="app.js?v=24"></script>
 </body>
 </html>
