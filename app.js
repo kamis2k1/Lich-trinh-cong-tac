@@ -46,16 +46,18 @@ const dmy=s=>s.split("-").reverse().join("/");
 const wd=["Chủ nhật","Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"];
 const jaName=(c,txt)=>{ // tên tiếng Nhật cho trang tra tàu Nhật
   if(!c)return txt;let n=c.geo?c.ja:(c[0].match(/[\u3040-\u30ff\u4e00-\u9fff]+$/)||[""])[0];
-  if(!n||/[a-z]/i.test(n))return txt;if(/station|駅|\bga\b/i.test(txt)&&!/駅$/.test(n))n+="駅";return n};
+  if(!n||/[a-z]/i.test(n))return txt;if(!/station|駅|\bga\b/i.test(txt))n=n.replace(/(市|町|村)$/,"");if(/station|駅|\bga\b/i.test(txt)&&!/駅$/.test(n))n+="駅";return n};
 const toMin=t=>{const [h,m]=(t||"08:00").split(":").map(Number);return h*60+m};
 const hhmm=m=>{const d=Math.floor(m/1440),r=((m%1440)+1440)%1440;return String(Math.floor(r/60)).padStart(2,"0")+":"+String(r%60).padStart(2,"0")+(d>0?" (hôm sau)":d<0?" (hôm trước)":"")};
 function legTimes(mode,t,hours){const m=toMin(t),L=Math.round((hours||0)*12)*5;return mode==="arr"?{dep:hhmm(m-L),arr:hhmm(m)}:{dep:hhmm(m),arr:hhmm(m+L)}}
-function routeLinks(from,to,fromJa,toJa,date,mode,t){
+function routeLinks(from,to,fromJa,toJa,date,mode,t,legH){
   const e=encodeURIComponent,[y,mo,d]=date.split("-"),[h,mi]=(t||"08:00").split(":");
-  const H=+h,ap=H>=12?"pm":"am",h12=(H%12)||12;
+  // Google Maps chỉ nhận giờ khởi hành: nếu chọn "đến trước", lùi giờ theo thời gian đi ước tính
+  let gm=toMin(t);if(mode==="arr")gm=((gm-Math.round((legH||0)*12)*5-30)%1440+1440)%1440;
+  const H=Math.floor(gm/60),ap=H>=12?"pm":"am",h12=(H%12)||12,gmi=String(gm%60).padStart(2,"0");
   return [
-    ["Google Maps",`https://www.google.com/maps/dir/?saddr=${e(from)}&daddr=${e(to)}&dirflg=r&ttype=${mode}&date=${mo}%2F${d}%2F${y.slice(2)}&time=${h12}%3A${mi}${ap}`],
-    ["Yahoo!乗換案内",`https://transit.yahoo.co.jp/search/result?from=${e(fromJa)}&to=${e(toJa)}&y=${y}&m=${mo}&d=${d}&hh=${h}&m1=${mi[0]}&m2=${mi[1]}&type=${mode==="arr"?4:1}&ticket=ic&expkind=1&ws=3&s=0`],
+    ["★ Yahoo!乗換案内 (giờ tàu chính xác)",`https://transit.yahoo.co.jp/search/result?from=${e(fromJa)}&to=${e(toJa)}&y=${y}&m=${mo}&d=${d}&hh=${h}&m1=${mi[0]}&m2=${mi[1]}&type=${mode==="arr"?4:1}&ticket=ic&expkind=1&ws=3&s=0&al=1&shin=1&ex=1&hb=1&lb=1&sr=1`],
+    ["Google Maps",`https://www.google.com/maps/dir/?saddr=${e(from)}&daddr=${e(to)}&dirflg=r&ttype=dep&date=${mo}%2F${d}%2F${y.slice(2)}&time=${h12}%3A${gmi}${ap}`],
     ["ジョルダン",`https://www.jorudan.co.jp/norikae/cgi/nori.cgi?eki1=${e(fromJa)}&eki2=${e(toJa)}&Dym=${y}${mo}&Ddd=${+d}&Dhh=${+h}&Dmn1=${mi[0]}&Dmn2=${mi[1]}&Cway=${mode==="arr"?1:0}&S=${e("検索")}`]
   ]}
 const short=c=>c?(c.geo?c[0]:c[0].split(" ")[0]):"";
@@ -90,7 +92,7 @@ function transportOptions(A,B){
     const acc=(A.acc||0)+(B.acc||0),accOk=(A.acc||0)<1.6&&(B.acc||0)<1.6;
     const accTxt=acc>0.3?` Cộng thêm ~${fmtH(acc)} đi từ/đến sân bay gần nhất${A.apName&&A.geo?` (${A.apName})`:""}${B.apName&&B.geo?` (${B.apName})`:""}.`:"";
     if(A[1]&&B[1]&&A[1]!==B[1]&&dist>(A.geo||B.geo?500:350)&&accOk) opts.push({k:"fly",n:"Máy bay (ANA/JAL/Peach)",t:dist/700+2.2+acc,ccy:"JPY",p:9000+dist*14,d:`Bay ~${fmtH(dist/700+.3)}, cộng khoảng 2 giờ làm thủ tục.`+accTxt});
-    if((A.geo||B.geo)&&!(A[4]&&B[4])) opts.push({k:"train",n:road>200?"Tàu JR + Shinkansen":"Tàu JR",t:road/(road>600?160:road>200?100:65)+.5,ccy:"JPY",p:500+road*(road>200?26:20),d:"Có thể phải đổi tàu hoặc nối xe buýt. Bấm \"Lộ trình thực tế\" bên dưới để xem giờ tàu và chỗ đổi tàu chính xác."});
+    if((A.geo||B.geo)&&!(A[4]&&B[4])) opts.push({k:"train",n:road>200?"Tàu JR + Shinkansen":"Tàu JR",t:road/(road>600?160:road>200?100:65)+.5,ccy:"JPY",p:800+road*(road>200?40:22),d:"Có thể phải đổi tàu hoặc nối xe buýt. Bấm Yahoo!乗換案内 bên dưới để xem giờ tàu, giá và chỗ đổi tàu chính xác."});
     else if(A[4]&&B[4]) opts.push({k:"train",n:"Shinkansen",t:road/200+.4,ccy:"JPY",p:1500+road*24,d:"Tàu cao tốc, đến thẳng ga trung tâm. Đặt chỗ ngồi chỉ định trên smart EX hoặc Eki-net."});
     else if(road<700&&!(A.geo||B.geo)) opts.push({k:"train",n:"Tàu JR tốc hành",t:road/85+.3,ccy:"JPY",p:800+road*22,d:"Tàu tốc hành (limited express), mua vé trên app JR hoặc tại ga."});
     if(road<1000) opts.push({k:"bus",n:"Xe buýt đường dài (Willer, JR Bus)",t:road/70,ccy:"JPY",p:1500+road*9,d:road>350?"Có chuyến chạy đêm, tiết kiệm tiền khách sạn.":"Rẻ, nhưng có thể chậm do kẹt xe cao tốc."});
@@ -121,7 +123,6 @@ function bookingLinks(A,B,fromT,toT,d1,d2,pax,opts){
     if(vnAny&&!jpAny) L.push(["Bamboo Airways","https://www.bambooairways.com/"],["Traveloka",`https://www.traveloka.com/vi-vn/flight`]);
   }
   if(A&&B&&A[5]==="JP"&&B[5]==="JP"){
-    L.unshift(["★ Lộ trình thực tế, giờ tàu - Google Maps",`https://www.google.com/maps/dir/?api=1&origin=${e(fromT)}&destination=${e(toT)}&travelmode=transit`]);
     L.push(["Tra lộ trình tàu - NAVITIME",`https://www.navitime.co.jp/transfer/searchlist?orvStationName=${e(fromT.replace(/\s*(station|駅|ga)$/i,""))}&dnvStationName=${e(toT.replace(/\s*(station|駅|ga)$/i,""))}`]);
     if(has("train")) L.push(["Vé Shinkansen Tokaido/Sanyo - smart EX","https://smart-ex.jp/"],["Vé JR Đông - Eki-net","https://www.eki-net.com/"],["Vé JR Tây - e5489","https://e5489.jr-odekake.net/"]);
     if(has("bus")) L.push(["Xe buýt đường dài - Willer","https://travel.willer.co.jp/"],["Xe buýt - Kosoku Bus","https://www.kosokubus.com/"]);
@@ -162,10 +163,10 @@ async function build(){
   $("opts").innerHTML=(dist?`<p class="muted">Khoảng cách đường chim bay ~${Math.round(dist)} km.${intl?` Giá quy đổi theo tỉ giá ước tính 1¥ ≈ ${JPY2VND}đ.`:""}</p>`:"")+opts.map((o,i)=>`<div class="opt"><div><b>${o.n}${i===0?'<span class="tag best">Phù hợp nhất</span>':''}</b><span class="muted">${o.d}</span></div><div style="text-align:right">${o.t!=null?`<b>${fmtH(o.t)}</b><span class="muted">~${money(o.p*pax,o.ccy)} / chiều${pax>1?` (${pax} người)`:''}</span>`:''}</div></div>`).join("");
 
   const L=bookingLinks(A,B,fromT,toT,d1,d2,pax,opts);
-  let legHtml="";
+  let legHtml="";const best0=opts[0];
   if(A&&B&&A[5]==="JP"&&B[5]==="JP"){
     const fj=jaName(A,fromT),tj=jaName(B,toT);
-    const leg=(lbl,f,t,fJ,tJ,date,mode,tm)=>`<div class="leg"><b>${lbl}: ${mode==="arr"?"đến trước":"khởi hành"} ${tm}, ${dmy(date)}</b>${routeLinks(f,t,fJ,tJ,date,mode,tm).map(l=>`<a href="${l[1]}" target="_blank" rel="noopener">${l[0]} ↗</a>`).join("")}</div>`;
+    const leg=(lbl,f,t,fJ,tJ,date,mode,tm)=>`<div class="leg"><b>${lbl}: ${mode==="arr"?"đến trước":"khởi hành"} ${tm}, ${dmy(date)}</b>${routeLinks(f,t,fJ,tJ,date,mode,tm,best0.t).map(l=>`<a href="${l[1]}" target="_blank" rel="noopener">${l[0]} ↗</a>`).join("")}</div>`;
     legHtml=`<p class="muted" style="margin:0 0 6px">Giờ tàu thật theo giờ bạn chọn:</p>`+leg("Lượt đi",fromT,toT,fj,tj,d1,m1,t1)+leg("Lượt về",toT,fromT,tj,fj,d2,m2,t2)+`<p class="muted" style="margin:4px 0 6px">Đặt vé và phòng:</p>`;
   }
   $("links").innerHTML=legHtml+L.map(l=>`<a href="${l[1]}" target="_blank" rel="noopener">${l[0]} ↗</a>`).join("");
