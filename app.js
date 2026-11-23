@@ -363,6 +363,7 @@ renderSaved();renderPlaces();renderNav();
 // ===== Nhận chuyến gửi từ trang Yahoo (nút bookmark) =====
 const BM=`javascript:(()=>{var p=new URL(location.href).searchParams,t=document.body.innerText,c=t.split(/\\nルート\\d+\\n/).filter(x=>/\\d{1,2}:\\d{2}発→\\d{1,2}:\\d{2}着/.test(x)).slice(0,6).map(x=>x.slice(0,900));if(!/transit\\.yahoo\\.co\\.jp/.test(location.host)||!c.length){alert('Hãy mở trang KẾT QUẢ tìm đường của Yahoo!乗換案内 rồi bấm lại.');return}var z=n=>('0'+n).slice(-2);location.href='${location.origin+location.pathname}\\x23yahoo='+encodeURIComponent(JSON.stringify({d:p.get('y')+'-'+z(p.get('m'))+'-'+z(p.get('d')),f:p.get('from')||'',t:p.get('to')||'',r:c}))})()`;
 $("bmLink").href=BM;
+$("bmLink").addEventListener("click",e=>{e.preventDefault();$("bmMsg").textContent="Đừng bấm nút ở đây. Hãy kéo nút lên thanh dấu trang (Favorites bar), rồi bấm nó khi đang ở trang kết quả Yahoo.";$("bmMsg").style.color="#d93025"});
 $("bmCopy").onclick=async()=>{try{await navigator.clipboard.writeText(BM);$("bmMsg").textContent="Đã copy mã nút."}catch{$("bmMsg").textContent="Không copy được, hãy giữ lâu vào nút để copy link."}};
 async function receiveYahoo(){
   const h=location.hash;if(!h.startsWith("#yahoo="))return;

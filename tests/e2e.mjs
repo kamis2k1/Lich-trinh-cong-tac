@@ -341,6 +341,7 @@ await test("Dữ liệu gửi về bị hỏng / chèn mã → báo lỗi, khôn
   await p.goto(BASE + "#yahoo=" + encodeURIComponent(JSON.stringify({ d: T.d1, f: '<img src=x onerror="window.__w=1">', t: "x", r: ["08:00発→09:00着 1,000円 ＪＲ<img/src=x/onerror=window.__w=1>"] })));
   await p.waitForSelector(".ypick"); ok(!(await p.evaluate(() => window.__w)), "mã đã chạy!");
 });
+await test("Bấm nhầm nút bookmark ngay trên web → hướng dẫn, không chạy", async p => { await p.click("#bmLink"); ok(/kéo nút/.test(await p.textContent("#bmMsg")), "không hướng dẫn"); });
 await test("Nút bookmark là mã javascript hợp lệ, đúng địa chỉ web", async p => {
   const href = await p.$eval("#bmLink", a => a.getAttribute("href"));
   ok(href.startsWith("javascript:(()=>{") && !href.includes("#yahoo"), href.slice(0, 60));
