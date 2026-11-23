@@ -44,7 +44,21 @@ const money=(n,ccy)=>{ // n tính theo ccy gốc, hiển thị theo CUR
   return CUR==="JPY"?"¥"+(Math.round(v/100)*100).toLocaleString("ja-JP"):(Math.round(v/10000)*10000).toLocaleString("vi-VN")+"đ"};
 const dmy=s=>s.split("-").reverse().join("/");
 const wd=["Chủ nhật","Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"];
-const short=c=>c?c[0].split(" ")[0]:"";
+const short=c=>c?(c.geo?c[0]:c[0].split(" ")[0]):"";
+// Tra địa điểm bất kỳ qua OpenStreetMap, gán sân bay/tàu theo thành phố lớn gần nhất
+async function geocode(q){
+  try{
+    const r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&accept-language=vi&q="+encodeURIComponent(q));
+    const j=await r.json();if(!j.length)return null;
+    const g=j[0],cc=((g.address&&g.address.country_code)||"").toUpperCase();
+    const c=[q,"",+g.lat,+g.lon,0,cc];c.geo=true;c.acc=0;
+    const near=C.filter(x=>x[5]===cc).map(x=>[x,km(c,x)]).sort((a,b)=>a[1]-b[1]);
+    const ap=near.find(([x])=>x[1]);
+    if(ap&&ap[1]<120){c[1]=ap[0][1];c.acc=ap[1]*1.3/45;c.apName=short(ap[0]);c.apKm=ap[1]}
+    const rail=near.find(([x])=>x[4]);if(rail&&rail[1]<25)c[4]=1;
+    return c;
+  }catch(e){return null}
+}
 
 let cur=null;
 $("f").addEventListener("submit",e=>{e.preventDefault();build()});
@@ -59,9 +73,12 @@ function transportOptions(A,B){
   }
   const road=dist*1.3;
   if(jp){
-    if(A[1]&&B[1]&&A[1]!==B[1]&&dist>350) opts.push({k:"fly",n:"Máy bay (ANA/JAL/Peach)",t:dist/700+2.2,ccy:"JPY",p:9000+dist*14,d:`Bay ~${fmtH(dist/700+.3)}, cộng khoảng 2 giờ ra sân bay và làm thủ tục.`});
-    if(A[4]&&B[4]) opts.push({k:"train",n:"Shinkansen",t:road/200+.4,ccy:"JPY",p:1500+road*24,d:"Tàu cao tốc, đến thẳng ga trung tâm. Đặt chỗ ngồi chỉ định trên smart EX hoặc Eki-net."});
-    else if(road<700) opts.push({k:"train",n:"Tàu JR tốc hành",t:road/85+.3,ccy:"JPY",p:800+road*22,d:"Tàu tốc hành (limited express), mua vé trên app JR hoặc tại ga."});
+    const acc=(A.acc||0)+(B.acc||0),accOk=(A.acc||0)<1.6&&(B.acc||0)<1.6;
+    const accTxt=acc>0.3?` Cộng thêm ~${fmtH(acc)} đi từ/đến sân bay gần nhất${A.apName&&A.geo?` (${A.apName})`:""}${B.apName&&B.geo?` (${B.apName})`:""}.`:"";
+    if(A[1]&&B[1]&&A[1]!==B[1]&&dist>(A.geo||B.geo?500:350)&&accOk) opts.push({k:"fly",n:"Máy bay (ANA/JAL/Peach)",t:dist/700+2.2+acc,ccy:"JPY",p:9000+dist*14,d:`Bay ~${fmtH(dist/700+.3)}, cộng khoảng 2 giờ làm thủ tục.`+accTxt});
+    if((A.geo||B.geo)&&!(A[4]&&B[4])) opts.push({k:"train",n:road>200?"Tàu JR + Shinkansen":"Tàu JR",t:road/(road>600?160:road>200?100:65)+.5,ccy:"JPY",p:500+road*(road>200?26:20),d:"Có thể phải đổi tàu hoặc nối xe buýt. Bấm \"Lộ trình thực tế\" bên dưới để xem giờ tàu và chỗ đổi tàu chính xác."});
+    else if(A[4]&&B[4]) opts.push({k:"train",n:"Shinkansen",t:road/200+.4,ccy:"JPY",p:1500+road*24,d:"Tàu cao tốc, đến thẳng ga trung tâm. Đặt chỗ ngồi chỉ định trên smart EX hoặc Eki-net."});
+    else if(road<700&&!(A.geo||B.geo)) opts.push({k:"train",n:"Tàu JR tốc hành",t:road/85+.3,ccy:"JPY",p:800+road*22,d:"Tàu tốc hành (limited express), mua vé trên app JR hoặc tại ga."});
     if(road<1000) opts.push({k:"bus",n:"Xe buýt đường dài (Willer, JR Bus)",t:road/70,ccy:"JPY",p:1500+road*9,d:road>350?"Có chuyến chạy đêm, tiết kiệm tiền khách sạn.":"Rẻ, nhưng có thể chậm do kẹt xe cao tốc."});
     if(road<300) opts.push({k:"car",n:"Thuê xe tự lái",t:road/65,ccy:"JPY",p:9000+road*2*35,d:"Cần bằng lái quốc tế (IDP) hoặc bằng Nhật. Có phí cao tốc."});
   }else{
@@ -90,7 +107,8 @@ function bookingLinks(A,B,fromT,toT,d1,d2,pax,opts){
     if(vnAny&&!jpAny) L.push(["Bamboo Airways","https://www.bambooairways.com/"],["Traveloka",`https://www.traveloka.com/vi-vn/flight`]);
   }
   if(A&&B&&A[5]==="JP"&&B[5]==="JP"){
-    L.push(["Tra lộ trình tàu - NAVITIME",`https://www.navitime.co.jp/transfer/searchlist?orvStationName=${e(fN)}&dnvStationName=${e(tN)}`]);
+    L.unshift(["★ Lộ trình thực tế, giờ tàu - Google Maps",`https://www.google.com/maps/dir/?api=1&origin=${e(fromT)}&destination=${e(toT)}&travelmode=transit`]);
+    L.push(["Tra lộ trình tàu - NAVITIME",`https://www.navitime.co.jp/transfer/searchlist?orvStationName=${e(fromT.replace(/\s*(station|駅|ga)$/i,""))}&dnvStationName=${e(toT.replace(/\s*(station|駅|ga)$/i,""))}`]);
     if(has("train")) L.push(["Vé Shinkansen Tokaido/Sanyo - smart EX","https://smart-ex.jp/"],["Vé JR Đông - Eki-net","https://www.eki-net.com/"],["Vé JR Tây - e5489","https://e5489.jr-odekake.net/"]);
     if(has("bus")) L.push(["Xe buýt đường dài - Willer","https://travel.willer.co.jp/"],["Xe buýt - Kosoku Bus","https://www.kosokubus.com/"]);
   }
@@ -101,17 +119,20 @@ function bookingLinks(A,B,fromT,toT,d1,d2,pax,opts){
   if(jpDest) L.push(["Khách sạn - Rakuten Travel","https://travel.rakuten.co.jp/"],["Khách sạn - Jalan","https://www.jalan.net/"]);
   L.push(["Khách sạn - Booking.com",`https://www.booking.com/searchresults.vi.html?ss=${e(tN)}&checkin=${d1}&checkout=${d2}&group_adults=${pax}&no_rooms=1`]);
   L.push(["Khách sạn - Agoda",`https://www.agoda.com/vi-vn/search?textToSearch=${e(tN)}&checkIn=${d1}&checkOut=${d2}&adults=${pax}&rooms=1`]);
-  if(!(A&&B&&A[5]!==B[5])) L.push(["Chỉ đường - Google Maps",`https://www.google.com/maps/dir/?api=1&origin=${e(fN)}&destination=${e(tN)}&travelmode=${A&&A[5]==="JP"?"transit":"driving"}`]);
+  if(!(A&&B&&A[5]!==B[5])&&!(A&&A[5]==="JP"&&B&&B[5]==="JP")) L.push(["Chỉ đường - Google Maps",`https://www.google.com/maps/dir/?api=1&origin=${e(fN)}&destination=${e(tN)}&travelmode=${A&&A[5]==="JP"?"transit":"driving"}`]);
   return L;
 }
 
-function build(){
+async function build(){
   $("err").textContent="";
   const fromT=$("from").value.trim(),toT=$("to").value.trim(),d1=$("d1").value,d2=$("d2").value,pax=+$("pax").value||1,pref=$("pref").value,note=$("note").value.trim();
   if(!fromT||!toT||!d1||!d2){$("err").textContent="Vui lòng nhập đủ 4 thông tin.";return}
   if(d2<d1){$("err").textContent="Ngày về phải sau hoặc trùng ngày đi.";return}
   if(norm(fromT)===norm(toT)&&fromT===toT){$("err").textContent="Điểm đi và điểm đến đang trùng nhau.";return}
-  const A=find(fromT),B=find(toT);
+  let A=find(fromT),B=find(toT);
+  if(!A||!B){$("err").textContent="Đang tìm địa điểm...";
+    if(!A)A=await geocode(fromT);if(!B){if(!A||A.geo)await new Promise(r=>setTimeout(r,1100));B=await geocode(toT)}
+    $("err").textContent=(!A||!B)?"Không tìm thấy "+(!A?fromT:toT)+", thử ghi rõ hơn (VD: Sasebo, Nagasaki).":"";}
   const nights=Math.round((new Date(d2)-new Date(d1))/864e5);
   CUR=(A&&A[5]==="JP")||(!A&&B&&B[5]==="JP")?"JPY":"VND";
   const jpDest=B&&B[5]==="JP",intl=A&&B&&A[5]!==B[5];
